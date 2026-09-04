@@ -1,0 +1,929 @@
+:root {
+  --font-main: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-heading: 'Outfit', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* Theme: Dark (Default) */
+  --bg-base: #07090e;
+  --glass-surface: rgba(255, 255, 255, 0.04);
+  --glass-surface-elevated: rgba(255, 255, 255, 0.07);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-border-hover: rgba(255, 255, 255, 0.24);
+  --glass-highlight: rgba(255, 255, 255, 0.22);
+
+  --text-primary: #ffffff;
+  --text-secondary: #cbd5e1;
+  --text-muted: #8090a7;
+
+  --input-bg: rgba(15, 23, 42, 0.65);
+  --input-border: rgba(255, 255, 255, 0.12);
+  --input-text: #ffffff;
+
+  --seg-bg: rgba(15, 23, 42, 0.75);
+  --seg-active-bg: rgba(255, 255, 255, 0.14);
+  --seg-active-text: #ffffff;
+
+  --btn-primary-bg: #ffffff;
+  --btn-primary-text: #07090e;
+
+  --shadow-glass: 0 20px 50px -10px rgba(0, 0, 0, 0.5), inset 0 1px 1px 0 rgba(255, 255, 255, 0.18);
+  --shadow-elevated: 0 30px 70px -15px rgba(0, 0, 0, 0.65), inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.25);
+
+  --card-rim-gradient: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.35) 20%, rgba(56, 189, 248, 0.5) 50%, rgba(255, 255, 255, 0.35) 80%, transparent 100%);
+  --mouse-specular-color: rgba(255, 255, 255, 0.12);
+
+  --wallpaper-base: #07090e;
+  --wave-1-grad: linear-gradient(135deg, #1d4ed8 0%, #06b6d4 50%, #10b981 100%);
+  --wave-2-grad: linear-gradient(135deg, #7c3aed 0%, #ec4899 60%, #f59e0b 100%);
+  --wave-3-grad: linear-gradient(135deg, #059669 0%, #0284c7 70%, #3b82f6 100%);
+  --wave-op-1: 0.45;
+  --wave-op-2: 0.38;
+  --wave-op-3: 0.40;
+  --grain-opacity: 0.035;
+
+  --accent-cyan: #38bdf8;
+  --accent-positive: #34d399;
+  --accent-negative: #fb7185;
+}
+
+[data-theme="light"] {
+  /* Theme: Apple Light Mode (macOS Sequoia / VisionOS Light Glass) */
+  --bg-base: #e9eef5;
+  --glass-surface: rgba(255, 255, 255, 0.65);
+  --glass-surface-elevated: rgba(255, 255, 255, 0.82);
+  --glass-border: rgba(0, 0, 0, 0.09);
+  --glass-border-hover: rgba(0, 0, 0, 0.2);
+  --glass-highlight: rgba(255, 255, 255, 0.95);
+
+  --text-primary: #090d16;
+  --text-secondary: #2a374a;
+  --text-muted: #5e6f87;
+
+  --input-bg: rgba(255, 255, 255, 0.88);
+  --input-border: rgba(0, 0, 0, 0.14);
+  --input-text: #090d16;
+
+  --seg-bg: rgba(226, 232, 240, 0.8);
+  --seg-active-bg: #ffffff;
+  --seg-active-text: #090d16;
+
+  --btn-primary-bg: #090d16;
+  --btn-primary-text: #ffffff;
+
+  --shadow-glass: 0 16px 40px -10px rgba(15, 23, 42, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04), inset 0 1px 2px 0 rgba(255, 255, 255, 0.95);
+  --shadow-elevated: 0 26px 55px -12px rgba(15, 23, 42, 0.14), 0 1px 4px rgba(0, 0, 0, 0.06), inset 0 1px 2px 0 rgba(255, 255, 255, 1);
+
+  --card-rim-gradient: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.95) 20%, rgba(56, 189, 248, 0.8) 50%, rgba(255, 255, 255, 0.95) 80%, transparent 100%);
+  --mouse-specular-color: rgba(255, 255, 255, 0.35);
+
+  --wallpaper-base: #e6ebf3;
+  --wave-1-grad: linear-gradient(135deg, #60a5fa 0%, #38bdf8 50%, #34d399 100%);
+  --wave-2-grad: linear-gradient(135deg, #a855f7 0%, #f472b6 60%, #fbbf24 100%);
+  --wave-3-grad: linear-gradient(135deg, #10b981 0%, #0284c7 70%, #6366f1 100%);
+  --wave-op-1: 0.55;
+  --wave-op-2: 0.45;
+  --wave-op-3: 0.50;
+  --grain-opacity: 0.02;
+
+  --accent-cyan: #0284c7;
+  --accent-positive: #059669;
+  --accent-negative: #e11d48;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--font-main);
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow-x: hidden;
+  position: relative;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* =========================================================================
+   1. Apple-Inspired Fluid Wallpaper (.apple-wallpaper)
+   ========================================================================= */
+.apple-wallpaper {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-color: var(--wallpaper-base);
+  transition: background-color 0.4s ease;
+}
+
+.wallpaper-wave {
+  position: absolute;
+  border-radius: 45%;
+  filter: blur(80px);
+  will-change: transform;
+  transition: opacity 0.4s ease;
+}
+
+.wave-1 {
+  width: 950px;
+  height: 600px;
+  background: var(--wave-1-grad);
+  opacity: var(--wave-op-1);
+  top: -120px;
+  left: 3%;
+  animation: waveMotion1 32s ease-in-out infinite alternate;
+}
+
+.wave-2 {
+  width: 850px;
+  height: 650px;
+  background: var(--wave-2-grad);
+  opacity: var(--wave-op-2);
+  top: 30%;
+  right: -80px;
+  animation: waveMotion2 38s ease-in-out infinite alternate;
+}
+
+.wave-3 {
+  width: 750px;
+  height: 550px;
+  background: var(--wave-3-grad);
+  opacity: var(--wave-op-3);
+  bottom: -100px;
+  left: 15%;
+  animation: waveMotion3 34s ease-in-out infinite alternate;
+}
+
+@keyframes waveMotion1 {
+  0% { transform: translate(0, 0) rotate(0deg) scale(1); }
+  50% { transform: translate(60px, 40px) rotate(8deg) scale(1.08); }
+  100% { transform: translate(-30px, 70px) rotate(-6deg) scale(0.96); }
+}
+
+@keyframes waveMotion2 {
+  0% { transform: translate(0, 0) rotate(0deg) scale(1); }
+  50% { transform: translate(-70px, 50px) rotate(-8deg) scale(1.1); }
+  100% { transform: translate(-40px, -40px) rotate(5deg) scale(0.94); }
+}
+
+@keyframes waveMotion3 {
+  0% { transform: translate(0, 0) rotate(0deg) scale(1); }
+  50% { transform: translate(80px, -50px) rotate(6deg) scale(1.06); }
+  100% { transform: translate(-40px, -30px) rotate(-4deg) scale(0.98); }
+}
+
+.grain-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: var(--grain-opacity);
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+}
+
+/* =========================================================================
+   2. Liquid Glass Cards & Architectural Geometry (NO PILL CAPSULES)
+   ========================================================================= */
+.app-container {
+  position: relative;
+  z-index: 2;
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 32px 24px 80px;
+}
+
+.liquid-card {
+  position: relative;
+  width: 100%;
+  border-radius: 14px;
+  background: var(--glass-surface);
+  backdrop-filter: blur(36px) saturate(210%) contrast(104%);
+  -webkit-backdrop-filter: blur(36px) saturate(210%) contrast(104%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-glass);
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, background-color 0.25s ease;
+  overflow: hidden;
+}
+
+.liquid-card:hover {
+  border-color: var(--glass-border-hover);
+  box-shadow: var(--shadow-elevated);
+}
+
+.liquid-card-elevated {
+  background: var(--glass-surface-elevated);
+  border: 1px solid var(--glass-border-hover);
+  box-shadow: var(--shadow-elevated);
+}
+
+.card-rim {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--card-rim-gradient);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.card-specular {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle 420px at var(--mouse-x, 50%) var(--mouse-y, 50%), var(--mouse-specular-color), transparent 75%);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: 1;
+}
+
+.liquid-card:hover .card-specular {
+  opacity: 1;
+}
+
+/* =========================================================================
+   3. Architectural Navigation Header (Clean 12px Squircle, NO PILL)
+   ========================================================================= */
+.nav-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  margin-bottom: 24px;
+  border-radius: 12px;
+}
+
+.brand-wrap {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  text-decoration: none;
+}
+
+.gem-mark {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-cyan);
+  filter: drop-shadow(0 2px 6px rgba(56, 189, 248, 0.3));
+}
+
+.gem-mark svg {
+  width: 100%;
+  height: 100%;
+  stroke-width: 1.5;
+}
+
+.brand-text-block {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.brand-name {
+  font-family: var(--font-heading);
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.brand-sub {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+}
+
+.header-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Institutional Status Line (Rectangular architectural tag, NO PILL) */
+.institutional-tag {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--input-bg);
+  border: 1px solid var(--glass-border);
+  padding: 6px 12px;
+  border-radius: 6px;
+  letter-spacing: 0.04em;
+}
+
+.currency-select {
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  color: var(--text-primary);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.currency-select:focus {
+  border-color: var(--accent-cyan);
+}
+
+/* Theme Toggle Button (Light/Dark) */
+.theme-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  color: var(--text-primary);
+  width: 34px;
+  height: 34px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.theme-toggle-btn:hover {
+  border-color: var(--glass-border-hover);
+  transform: translateY(-1px);
+}
+
+/* =========================================================================
+   4. Specimen Catalog Bar (Architectural Segmented Rail, NO PILL BADGES)
+   ========================================================================= */
+.catalog-bar {
+  display: flex;
+  align-items: stretch;
+  background: var(--glass-surface);
+  backdrop-filter: blur(28px) saturate(190%);
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  overflow-x: auto;
+  margin-bottom: 24px;
+  scrollbar-width: none;
+}
+
+.catalog-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.catalog-bar-kicker {
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--text-muted);
+  border-right: 1px solid var(--glass-border);
+  white-space: nowrap;
+}
+
+.catalog-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-main);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  border-right: 1px solid var(--glass-border);
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.catalog-tab:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+}
+
+.catalog-tab.active {
+  background: var(--seg-active-bg);
+  color: var(--seg-active-text);
+  font-weight: 600;
+}
+
+.catalog-tab-num {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  opacity: 0.8;
+}
+
+.catalog-tab.active .catalog-tab-num {
+  color: var(--accent-cyan);
+}
+
+/* =========================================================================
+   5. Calculator Grid & Technical Inputs
+   ========================================================================= */
+.calc-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 980px) {
+  .calc-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.editorial-section-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 18px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.editorial-title {
+  font-family: var(--font-heading);
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.editorial-subtag {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+
+.field-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--glass-border-subtle);
+}
+
+.field-row:last-child {
+  border-bottom: none;
+}
+
+.field-label-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.field-main-label {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.field-sub-label {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+/* Glass Inputs & Selects */
+.glass-input, .glass-select {
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  color: var(--input-text);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-family: var(--font-main);
+  font-size: 13.5px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.glass-input:focus, .glass-select:focus {
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.25);
+}
+
+.glass-select {
+  cursor: pointer;
+}
+
+.glass-select option {
+  background: var(--bg-base);
+  color: var(--text-primary);
+}
+
+/* Segmented Control (Architectural, NO PILL) */
+.seg-control {
+  display: flex;
+  background: var(--seg-bg);
+  padding: 2px;
+  border-radius: 6px;
+  border: 1px solid var(--input-border);
+  gap: 2px;
+}
+
+.seg-btn {
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  transition: all 0.15s;
+}
+
+.seg-btn.active {
+  background: var(--seg-active-bg);
+  color: var(--seg-active-text);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Sliders */
+.slider-container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.slider-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12.5px;
+}
+
+.slider-val {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--accent-cyan);
+}
+
+input[type=range] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--input-border);
+  outline: none;
+  cursor: pointer;
+}
+
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--text-primary);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  cursor: grab;
+  transition: transform 0.15s ease;
+}
+
+input[type=range]::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+/* =========================================================================
+   6. Sticky Luxury Valuation Panel
+   ========================================================================= */
+.sticky-panel {
+  position: sticky;
+  top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Authentic Appraisal Classification Block (Architectural, NO PILL BADGE) */
+.specimen-grade-block {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--input-bg);
+  border: 1px solid var(--glass-border);
+  border-left: 3px solid var(--accent-cyan);
+  border-radius: 4px;
+  margin-bottom: 14px;
+}
+
+.grade-kicker {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.grade-value {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent-cyan);
+  letter-spacing: 0.06em;
+}
+
+.val-context-heading {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.val-price-hero {
+  font-family: var(--font-heading);
+  font-size: clamp(32px, 3.6vw, 42px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  margin: 6px 0 8px;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.val-price-sub {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+}
+
+.val-midpoint-card {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  background: var(--input-bg);
+  border: 1px solid var(--glass-border);
+  padding: 10px 14px;
+  border-radius: 6px;
+  margin-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+}
+
+/* View Mode Segmented Rail (Architectural, NO PILL) */
+.view-mode-bar {
+  display: flex;
+  background: var(--seg-bg);
+  padding: 3px;
+  border-radius: 6px;
+  border: 1px solid var(--input-border);
+  margin-bottom: 20px;
+}
+
+.view-mode-btn {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  transition: all 0.15s;
+}
+
+.view-mode-btn.active {
+  background: var(--seg-active-bg);
+  color: var(--seg-active-text);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Primary Action Button */
+.liquid-btn-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 13px 20px;
+  border-radius: 8px;
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
+  font-family: var(--font-main);
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: var(--shadow-glass);
+}
+
+.liquid-btn-primary:hover {
+  opacity: 0.92;
+  transform: translateY(-1px);
+}
+
+/* Audit Table */
+.audit-table-wrap {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--glass-border);
+}
+
+.audit-table-title {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.audit-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.audit-table tr {
+  border-bottom: 1px solid var(--glass-border-subtle);
+}
+
+.audit-table td {
+  padding: 6px 2px;
+}
+
+.audit-factor {
+  text-align: right;
+  font-family: var(--font-mono);
+  font-weight: 500;
+}
+
+.audit-factor.positive { color: var(--accent-positive); }
+.audit-factor.negative { color: var(--accent-negative); }
+.audit-factor.neutral { color: var(--accent-cyan); }
+
+.sourcing-note {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-muted);
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--glass-border-subtle);
+  line-height: 1.5;
+}
+
+/* Market Comparables & Scraped Sources */
+.market-comparables-section {
+  margin-top: 24px;
+}
+
+.comparable-stat-banner {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr 1.1fr;
+  gap: 12px;
+  background: var(--input-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+
+.comp-stat-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.comp-stat-label {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+}
+
+.comp-stat-val {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.comparable-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.comparable-card {
+  background: var(--glass-surface);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+.comparable-card:hover {
+  background: var(--glass-surface-elevated);
+  border-color: var(--glass-border-hover);
+  transform: translateY(-1px);
+}
+
+.comp-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.comp-card-title-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.comp-stone-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.comp-stone-meta {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.comp-card-price-wrap {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.comp-price-per-ct {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent-cyan);
+}
+
+.comp-price-total {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.comp-card-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 6px;
+  border-top: 1px solid var(--glass-border);
+  font-size: 11px;
+}
+
+.comp-source-name {
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+}
+
+.comp-link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent-cyan);
+  text-decoration: none;
+  font-weight: 500;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--input-bg);
+  border: 1px solid var(--glass-border);
+  transition: all 0.15s ease;
+}
+
+.comp-link-btn:hover {
+  background: var(--glass-border-hover);
+  color: var(--text-primary);
+  text-decoration: none;
+}
+

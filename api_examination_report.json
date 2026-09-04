@@ -1,0 +1,135 @@
+{
+  "target": "https://gemindex.world/",
+  "auditTimestamp": "2026-09-03T13:08:31.785Z",
+  "overallResult": {
+    "hasApplicationApiCalls": false,
+    "hasThirdPartyTelemetryCalls": true,
+    "architecture": "100% Client-Side Single Page Application (JAMstack/Static)"
+  },
+  "testResults": [
+    {
+      "testCase": "TC1: Initial Page Load",
+      "totalRequests": 28,
+      "xhrFetchRequests": 6,
+      "applicationApiCalls": 0,
+      "passed": true,
+      "details": "Loaded in 15230ms. Total network requests: 28. Application backend API calls: 0."
+    },
+    {
+      "testCase": "TC2: Preset Switching (Spinel, Sapphire, Emerald, Paraiba)",
+      "totalRequests": 0,
+      "applicationApiCalls": 0,
+      "passed": true,
+      "details": "All 4 preset calculations executed instantly client-side without firing any network requests."
+    },
+    {
+      "testCase": "TC3: Dynamic Inputs & Slider Adjustments",
+      "totalRequests": 0,
+      "applicationApiCalls": 0,
+      "passed": true,
+      "details": "Pricing recalculated locally in memory. Zero network/API calls made."
+    },
+    {
+      "testCase": "TC4: Color Picker Interaction",
+      "totalRequests": 0,
+      "applicationApiCalls": 0,
+      "passed": true,
+      "details": "Color conversion and swatch updates performed entirely in client-side JS."
+    },
+    {
+      "testCase": "TC5: PDF Valuation Report Generation",
+      "totalRequests": 0,
+      "applicationApiCalls": 0,
+      "passed": true,
+      "details": "PDF generated entirely in the browser using jsPDF library (client-side DOM/Canvas/PDF synthesis). Zero server API calls."
+    },
+    {
+      "testCase": "TC6: 100% Offline Capability Test",
+      "passed": true,
+      "details": "When network is completely severed (offline mode), the pricing engine functions with full fidelity, proving zero backend API dependency."
+    },
+    {
+      "testCase": "TC7: Monkey-Patched fetch/XHR/WebSocket Spy Audit",
+      "totalIntercepted": 6,
+      "thirdPartyTelemetryCalls": 6,
+      "firstPartyApplicationApiCalls": 0,
+      "passed": true,
+      "details": "In-page spy confirmed 0 application API calls. All intercepted calls (6) belong to third-party analytics (Google Tag Manager/Analytics and Microsoft Clarity)."
+    }
+  ],
+  "networkRequestsSummary": {
+    "totalRequests": 28,
+    "documentRequests": 1,
+    "cdnScripts": [
+      "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js",
+      "https://cdn.jsdelivr.net/npm/lenis@1.1.20/dist/lenis.min.js"
+    ],
+    "thirdPartyTelemetryEndpoints": [
+      "https://www.googletagmanager.com/gtag/js",
+      "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js",
+      "https://www.clarity.ms/tag/y8f6npujgp",
+      "https://scripts.clarity.ms/0.8.69/clarity.js",
+      "https://pagead2.googlesyndication.com/pagead/managed/js/adsense/m202608270101/show_ads_impl_fy2021.js",
+      "https://www.google-analytics.com/g/collect",
+      "https://googleads.g.doubleclick.net/pagead/html/r20260901/r20190131/zrt_lookup_fy2021.html",
+      "https://pagead2.googlesyndication.com/pagead/gen_204",
+      "https://googleads.g.doubleclick.net/pagead/ads",
+      "https://n.clarity.ms/collect",
+      "https://c.clarity.ms/c.gif",
+      "https://ep1.adtrafficquality.google/getconfig/sodar",
+      "https://ep2.adtrafficquality.google/sodar/sodar2.js",
+      "https://c.bing.com/c.gif",
+      "https://ep2.adtrafficquality.google/sodar/sodar2/255/runner.html",
+      "https://pagead2.googlesyndication.com/pagead/sodar",
+      "https://pagead2.googlesyndication.com/bg/-JcAveItpmbhgj91Vkul9zmlsOYfdyppFh5MtucEy-g.js",
+      "https://ep2.adtrafficquality.google/generate_204",
+      "https://ep1.adtrafficquality.google/pagead/sodar"
+    ],
+    "applicationApiCalls": []
+  },
+  "inPageSpyLogs": [
+    {
+      "type": "fetch",
+      "url": "https://www.google-analytics.com/g/collect?v=2&tid=G-YD09SSKB23&gtm=45je6911v9262359383za200zd9262359383&_p=1788440894260&gcd=13l3l3l3l1l1&npa=0&dma=0&are=1&cid=1300665839.1788440895&frm=0&ngs=1&pscdl=noapi&rcb=16&sr=1280x900&uaa=x86&uab=64&uafvl=Not%253DA%253FBrand%3B99.0.0.0%7CGoogle%2520Chrome%3B151.0.7922.174%7CChromium%3B151.0.7922.174&uam=&uamb=0&uap=Windows&uapv=10.0&uaw=0&ul=en-us&_s=1&tag_exp=115616986~115938466~115938468~118897920~118897930~120213116~120385423&sid=1788440894&sct=1&seg=0&dl=https%3A%2F%2Fgemindex.world%2F&dt=Gem%20Index%20%E2%80%94%20Coloured%20Gemstone%20Price%20Calculator&en=page_view&_fv=1&_nsi=1&_ss=1&_ee=1&tfd=1928",
+      "method": "POST",
+      "body": null,
+      "timestamp": "2026-09-03T13:08:14.903Z",
+      "stack": "Error\n    at window.fetch (<anonymous>:17:16)\n    at ud (https://www.googletagmanager.com/gtag/js?id=G-YD09SSKB23:269:391)\n    at el (https://www.googletagmanager.com/gtag/js?id=G-YD09SSKB23:423:1280)\n    at JQ (https://www.googletagmanager.com/gtag/js?id=G-YD09SSKB23:977:183)\n    at MQ (https://www.googletagmanager.com/gtag/js?id=G-YD09SSKB23:978:176)\n    at SQ.M (https://www.googletagmanager.com/gtag/js?id=G-YD09SSKB23:984:459)\n    at SQ.add (https://www.googletagmanager.com/gtag/js?id=G-YD09SSKB23:986:17)\n    at l.Nn (https://www.googletagmanager.com/gtag/js?id=G-YD09SSKB23:1006:355)\n    at l.Yt (https://www.googletagmanager.com/gtag/js?id=G-YD09SSKB23:1006:277)\n    at https://www.googletagmanager.com/gtag/js?id=G-YD09SSKB23:1004:89"
+    },
+    {
+      "type": "XMLHttpRequest",
+      "url": "https://n.clarity.ms/collect",
+      "method": "POST",
+      "body": "31,139,8,0,0,0,0,0,0,10,237,189,93,147,220,70,146,32,248,87,98,192,97,145,213,141,76,34,190,240,145,101,185,179,20,73,73,236,161,36,118,147,106,77,79,169,76,134,76,68,102,130,133,4,82,0,178,62,88,198,",
+      "timestamp": "2026-09-03T13:08:15.180Z"
+    },
+    {
+      "type": "XMLHttpRequest",
+      "url": "https://ep1.adtrafficquality.google/getconfig/sodar?sv=200&tid=gda&tv=r20260901&st=env&sjk=1067850794990719",
+      "method": "GET",
+      "body": null,
+      "timestamp": "2026-09-03T13:08:15.232Z"
+    },
+    {
+      "type": "XMLHttpRequest",
+      "url": "https://n.clarity.ms/collect",
+      "method": "POST",
+      "body": "31,139,8,0,0,0,0,0,0,10,165,86,219,110,227,56,18,253,149,30,2,230,19,229,240,162,171,3,98,145,113,119,176,110,36,153,237,77,118,210,51,65,96,80,34,109,211,145,68,45,73,249,146,197,254,251,130,146,157,",
+      "timestamp": "2026-09-03T13:08:16.208Z"
+    },
+    {
+      "type": "XMLHttpRequest",
+      "url": "https://n.clarity.ms/collect",
+      "method": "POST",
+      "body": "31,139,8,0,0,0,0,0,0,10,165,79,203,78,195,48,16,252,149,178,231,105,234,71,146,186,69,185,113,225,194,5,137,75,228,131,91,187,105,144,235,68,177,3,68,136,127,71,13,20,122,224,134,86,26,141,118,103,103",
+      "timestamp": "2026-09-03T13:08:18.241Z"
+    },
+    {
+      "type": "XMLHttpRequest",
+      "url": "https://n.clarity.ms/collect",
+      "method": "POST",
+      "body": "31,139,8,0,0,0,0,0,0,10,205,82,77,139,219,48,16,253,43,101,142,229,97,235,195,31,146,139,15,187,236,150,45,116,89,40,189,44,194,7,109,172,196,110,29,219,117,228,77,67,233,127,47,214,38,161,129,82,90,1",
+      "timestamp": "2026-09-03T13:08:28.152Z"
+    }
+  ]
+}
