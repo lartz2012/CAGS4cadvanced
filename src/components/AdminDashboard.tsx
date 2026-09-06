@@ -32,6 +32,16 @@ import {
   GemInputParams
 } from '../engine/pricingModel';
 import { SPECIES_CATALOG } from '../engine/speciesCatalog';
+import {
+  getLocalConfigOverrides,
+  saveLocalConfigOverrides,
+  clearLocalConfigOverrides,
+  getLocalPriceOverrides,
+  saveLocalPriceOverride,
+  clearLocalPriceOverride,
+  clearAllLocalPriceOverrides,
+  mergeConfigOverrides
+} from '../engine/configSync';
 
 const API = ''; // Relative path works on both localhost (proxied) and Vercel
 
@@ -84,6 +94,29 @@ const DEFAULT_CONFIG_DATA = {
   colorTerms: TRADE_COLOR_TERMS
 };
 
+
+function getInitialPrices(): any[] {
+  const localPrices = getLocalPriceOverrides();
+  return Object.values(SPECIES_CATALOG).map(s => {
+    const hasLocal = localPrices[s.id] !== undefined;
+    const base = hasLocal ? Number(localPrices[s.id]) : s.basePricePerCarat;
+    return {
+      speciesId: s.id,
+      name: s.name,
+      family: s.family,
+      basePrice: base,
+      isManualOverride: hasLocal,
+      lastUpdated: hasLocal ? 'Persisted Local Override' : null,
+      source: hasLocal ? 'Admin Manual Override' : 'Catalog Default'
+    };
+  });
+}
+
+function getInitialConfigData(): any {
+  const localOverrides = getLocalConfigOverrides();
+  return mergeConfigOverrides(DEFAULT_CONFIG_DATA, localOverrides);
+}
+
 type Tab = 'sandbox' | 'prices' | 'origins' | 'treatments' | 'colorTerms' | 'species' | 'system';
 
 interface AdminDashboardProps {
@@ -116,8 +149,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, theme, o
     }
   };
   const [tab, setTab] = useState<Tab>('sandbox');
-  const [prices, setPrices] = useState<any[]>(DEFAULT_PRICES);
-  const [configData, setConfigData] = useState<any>(DEFAULT_CONFIG_DATA);
+  const [prices, setPrices] = useState<any[]>(getInitialPrices);
+  const [configData, setConfigData] = useState<any>(getInitialConfigData);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [saved, setSaved] = useState('');
@@ -188,11 +221,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, theme, o
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
-          setPrices(data);
+          const localPrices = getLocalPriceOverrides();
+          const merged = data.map(item => {
+            if (localPrices[item.speciesId] !== undefined) {
+              return { ...item, basePrice: localPrices[item.speciesId], isManualOverride: true };
+            }
+            return item;
+          });
+          setPrices(merged);
         }
       }
     } catch (e) {
-      console.warn('Using default prices fallback:', e);
+      console.warn('Using default prices fallback with local overrides:', e);
     }
   }, []);
 
@@ -202,12 +242,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, theme, o
       if (res.ok) {
         const d = await res.json();
         if (d && d.origins) {
-          setConfigData(d);
-          setSystemEdits(d.systemSettings || DEFAULT_CONFIG_DATA.systemSettings);
+          const localOverrides = getLocalConfigOverrides();
+          const merged = mergeConfigOverrides(d, localOverrides);
+          setConfigData(merged);
+          setSystemEdits(merged.systemSettings || DEFAULT_CONFIG_DATA.systemSettings);
         }
       }
     } catch (e) {
-      console.warn('Using default config fallback:', e);
+      console.warn('Using default config fallback with local overrides:', e);
     }
   }, []);
 
@@ -232,9 +274,34 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, theme, o
   // --------------------------------------------------------------------------
   // CRUD ACTIONS: SPECIES BASE PRICES
   // --------------------------------------------------------------------------
-  const submitPrice = async (speciesId: string) => {
-    const p = priceEdits[speciesId];
+  const submitPrice = async (speciesId: string, customVal?: number) => {
+    const p = customVal !== undefined ? customVal : priceEdits[speciesId];
     if (p === undefined || isNaN(p) || p <= 0) return;
+
+    // 1. Instant local state update & LocalStorage persistence
+    setPrices(prev => prev.map(item => item.speciesId === speciesId ? { ...item, basePrice: p, isManualOverride: true } : item));
+    saveLocalPriceOverride(speciesId, p);
+
+    setConfigData((prev: any) => {
+      const updated = { ...prev };
+      if (updated.species?.[speciesId]) {
+        updated.species[speciesId] = { ...updated.species[speciesId], basePricePerCarat: p };
+      }
+      return updated;
+    });
+
+    const curConfig = getLocalConfigOverrides();
+    if (!curConfig.species) curConfig.species = {};
+    curConfig.species[speciesId] = { ...(curConfig.species[speciesId] || {}), basePricePerCarat: p };
+    saveLocalConfigOverrides(curConfig);
+
+    const n = { ...priceEdits };
+    delete n[speciesId];
+    setPriceEdits(n);
+
+    flash(`Saved base price: ${p.toLocaleString()}/ct ✓`);
+
+    // 2. Background Cloud Sync
     try {
       await fetch(`${API}/api/admin/override-price`, {
         method: 'POST',
@@ -251,31 +318,43 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, theme, o
           }
         })
       });
-      // Local state update immediately for instant responsiveness
-      setPrices(prev => prev.map(item => item.speciesId === speciesId ? { ...item, basePrice: p, isManualOverride: true } : item));
-      const n = { ...priceEdits };
-      delete n[speciesId];
-      setPriceEdits(n);
-      await Promise.all([fetchPrices(), fetchConfig()]);
-      flash(`Updated base price to $${p.toLocaleString()}/ct`);
     } catch (err: any) {
-      alert('Error updating price: ' + err.message);
+      console.warn('Cloud price sync deferred to local storage:', err);
     }
   };
 
+  const quickAdjustPrice = (speciesId: string, stepPct: number) => {
+    const item = prices.find(p => p.speciesId === speciesId);
+    const baseline = SPECIES_CATALOG[speciesId]?.basePricePerCarat || 500;
+    const current = item?.basePrice || baseline;
+    const newPrice = Math.round(current * (1 + stepPct / 100));
+    submitPrice(speciesId, newPrice);
+  };
+
   const clearPrice = async (speciesId: string) => {
+    const def = SPECIES_CATALOG[speciesId]?.basePricePerCarat || 500;
+    setPrices(prev => prev.map(item => item.speciesId === speciesId ? { ...item, basePrice: def, isManualOverride: false } : item));
+    clearLocalPriceOverride(speciesId);
+
+    const curConfig = getLocalConfigOverrides();
+    if (curConfig.species?.[speciesId]) {
+      delete curConfig.species[speciesId].basePricePerCarat;
+      if (Object.keys(curConfig.species[speciesId]).length === 0) {
+        delete curConfig.species[speciesId];
+      }
+      saveLocalConfigOverrides(curConfig);
+    }
+
+    flash('Price restored to catalog default ✓');
+
     try {
       await fetch(`${API}/api/admin/clear-override`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ speciesId })
       });
-      const def = SPECIES_CATALOG[speciesId]?.basePricePerCarat || 500;
-      setPrices(prev => prev.map(item => item.speciesId === speciesId ? { ...item, basePrice: def, isManualOverride: false } : item));
-      await Promise.all([fetchPrices(), fetchConfig()]);
-      flash('Price restored to catalog default');
     } catch (err: any) {
-      alert('Error restoring default price: ' + err.message);
+      console.warn('Cloud clear price deferred:', err);
     }
   };
 
@@ -295,29 +374,77 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, theme, o
   // --------------------------------------------------------------------------
   const saveOrigin = async (cat: string, key: string) => {
     const v = originEdits[cat]?.[key];
-    if (!v) return;
-    await fetch(`${API}/api/admin/config`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'origin', category: cat, key, value: v })
+    if (!v || v.factor === undefined || isNaN(v.factor)) return;
+
+    setConfigData((prev: any) => {
+      const next = { ...prev };
+      if (!next.origins) next.origins = {};
+      if (!next.origins[cat]) next.origins[cat] = {};
+      next.origins[cat][key] = { ...next.origins[cat][key], factor: v.factor };
+      if (!next.overrides) next.overrides = {};
+      if (!next.overrides.origins) next.overrides.origins = {};
+      if (!next.overrides.origins[cat]) next.overrides.origins[cat] = {};
+      next.overrides.origins[cat][key] = { factor: v.factor };
+      return next;
     });
-    await fetchConfig();
-    flash(`Saved origin multiplier for ${key}`);
+
+    const cur = getLocalConfigOverrides();
+    if (!cur.origins) cur.origins = {};
+    if (!cur.origins[cat]) cur.origins[cat] = {};
+    cur.origins[cat][key] = { factor: v.factor };
+    saveLocalConfigOverrides(cur);
+
     setOriginEdits(p => {
       const n = { ...p };
       if (n[cat]) delete n[cat][key];
       return n;
     });
+
+    flash(`Saved origin multiplier: ×${v.factor.toFixed(2)} ✓`);
+
+    try {
+      await fetch(`${API}/api/admin/config`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'origin', category: cat, key, value: v })
+      });
+    } catch (err) {
+      console.warn('Cloud origin sync deferred to local storage:', err);
+    }
   };
 
   const resetOrigin = async (cat: string, key: string) => {
-    await fetch(`${API}/api/admin/config`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'origin', category: cat, key })
+    const baseOrig = ORIGIN_TABLE[cat]?.[key];
+    const defFactor = baseOrig?.factor || 1.0;
+
+    setConfigData((prev: any) => {
+      const next = { ...prev };
+      if (next.origins?.[cat]?.[key]) {
+        next.origins[cat][key] = { ...next.origins[cat][key], factor: defFactor };
+      }
+      if (next.overrides?.origins?.[cat]?.[key]) {
+        delete next.overrides.origins[cat][key];
+      }
+      return next;
     });
-    await fetchConfig();
-    flash(`Reset origin ${key} to default`);
+
+    const cur = getLocalConfigOverrides();
+    if (cur.origins?.[cat]?.[key]) {
+      delete cur.origins[cat][key];
+      saveLocalConfigOverrides(cur);
+    }
+
+    flash(`Reset origin ${key} to default ✓`);
+
+    try {
+      await fetch(`${API}/api/admin/config`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'origin', category: cat, key })
+      });
+    } catch (err) {
+      console.warn('Cloud reset origin deferred:', err);
+    }
   };
 
   const handleAddOrigin = async () => {
@@ -326,20 +453,44 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, theme, o
       return;
     }
     const cleanKey = newOrigin.key.toLowerCase().replace(/[^a-z0-9_]/g, '_');
-    await fetch(`${API}/api/admin/config`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        type: 'origin',
-        category: newOrigin.category,
-        key: cleanKey,
-        value: { label: newOrigin.label, factor: Number(newOrigin.factor) }
-      })
+    const newEntry = { label: newOrigin.label, factor: Number(newOrigin.factor) };
+
+    setConfigData((prev: any) => {
+      const next = { ...prev };
+      if (!next.origins) next.origins = {};
+      if (!next.origins[newOrigin.category]) next.origins[newOrigin.category] = {};
+      next.origins[newOrigin.category][cleanKey] = newEntry;
+      if (!next.overrides) next.overrides = {};
+      if (!next.overrides.origins) next.overrides.origins = {};
+      if (!next.overrides.origins[newOrigin.category]) next.overrides.origins[newOrigin.category] = {};
+      next.overrides.origins[newOrigin.category][cleanKey] = newEntry;
+      return next;
     });
-    await fetchConfig();
+
+    const cur = getLocalConfigOverrides();
+    if (!cur.origins) cur.origins = {};
+    if (!cur.origins[newOrigin.category]) cur.origins[newOrigin.category] = {};
+    cur.origins[newOrigin.category][cleanKey] = newEntry;
+    saveLocalConfigOverrides(cur);
+
     setShowAddOrigin(false);
     setNewOrigin({ category: 'corundum', key: '', label: '', factor: 1.0 });
-    flash(`Added new origin: ${newOrigin.label}`);
+    flash(`Added new origin: ${newOrigin.label} ✓`);
+
+    try {
+      await fetch(`${API}/api/admin/config`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'origin',
+          category: newOrigin.category,
+          key: cleanKey,
+          value: newEntry
+        })
+      });
+    } catch (err) {
+      console.warn('Cloud add origin deferred to local storage:', err);
+    }
   };
 
   // --------------------------------------------------------------------------
@@ -347,29 +498,77 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, theme, o
   // --------------------------------------------------------------------------
   const saveTreat = async (cat: string, key: string) => {
     const v = treatEdits[cat]?.[key];
-    if (!v) return;
-    await fetch(`${API}/api/admin/config`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'treatment', category: cat, key, value: v })
+    if (!v || v.factor === undefined || isNaN(v.factor)) return;
+
+    setConfigData((prev: any) => {
+      const next = { ...prev };
+      if (!next.treatments) next.treatments = {};
+      if (!next.treatments[cat]) next.treatments[cat] = {};
+      next.treatments[cat][key] = { ...next.treatments[cat][key], factor: v.factor };
+      if (!next.overrides) next.overrides = {};
+      if (!next.overrides.treatments) next.overrides.treatments = {};
+      if (!next.overrides.treatments[cat]) next.overrides.treatments[cat] = {};
+      next.overrides.treatments[cat][key] = { factor: v.factor };
+      return next;
     });
-    await fetchConfig();
-    flash(`Saved treatment factor for ${key}`);
+
+    const cur = getLocalConfigOverrides();
+    if (!cur.treatments) cur.treatments = {};
+    if (!cur.treatments[cat]) cur.treatments[cat] = {};
+    cur.treatments[cat][key] = { factor: v.factor };
+    saveLocalConfigOverrides(cur);
+
     setTreatEdits(p => {
       const n = { ...p };
       if (n[cat]) delete n[cat][key];
       return n;
     });
+
+    flash(`Saved treatment factor for ${key}: ×${v.factor.toFixed(2)} ✓`);
+
+    try {
+      await fetch(`${API}/api/admin/config`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'treatment', category: cat, key, value: v })
+      });
+    } catch (err) {
+      console.warn('Cloud treatment sync deferred:', err);
+    }
   };
 
   const resetTreat = async (cat: string, key: string) => {
-    await fetch(`${API}/api/admin/config`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'treatment', category: cat, key })
+    const baseTrt = TREATMENT_TABLE[cat]?.[key];
+    const defFactor = baseTrt?.factor || 1.0;
+
+    setConfigData((prev: any) => {
+      const next = { ...prev };
+      if (next.treatments?.[cat]?.[key]) {
+        next.treatments[cat][key] = { ...next.treatments[cat][key], factor: defFactor };
+      }
+      if (next.overrides?.treatments?.[cat]?.[key]) {
+        delete next.overrides.treatments[cat][key];
+      }
+      return next;
     });
-    await fetchConfig();
-    flash(`Reset treatment ${key} to default`);
+
+    const cur = getLocalConfigOverrides();
+    if (cur.treatments?.[cat]?.[key]) {
+      delete cur.treatments[cat][key];
+      saveLocalConfigOverrides(cur);
+    }
+
+    flash(`Reset treatment ${key} to default ✓`);
+
+    try {
+      await fetch(`${API}/api/admin/config`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'treatment', category: cat, key })
+      });
+    } catch (err) {
+      console.warn('Cloud reset treatment deferred:', err);
+    }
   };
 
   const handleAddTreat = async () => {
@@ -378,38 +577,82 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, theme, o
       return;
     }
     const cleanKey = newTreat.key.toLowerCase().replace(/[^a-z0-9_]/g, '_');
-    await fetch(`${API}/api/admin/config`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        type: 'treatment',
-        category: newTreat.category,
-        key: cleanKey,
-        value: { label: newTreat.label, factor: Number(newTreat.factor) }
-      })
+    const newEntry = { label: newTreat.label, factor: Number(newTreat.factor) };
+
+    setConfigData((prev: any) => {
+      const next = { ...prev };
+      if (!next.treatments) next.treatments = {};
+      if (!next.treatments[newTreat.category]) next.treatments[newTreat.category] = {};
+      next.treatments[newTreat.category][cleanKey] = newEntry;
+      if (!next.overrides) next.overrides = {};
+      if (!next.overrides.treatments) next.overrides.treatments = {};
+      if (!next.overrides.treatments[newTreat.category]) next.overrides.treatments[newTreat.category] = {};
+      next.overrides.treatments[newTreat.category][cleanKey] = newEntry;
+      return next;
     });
-    await fetchConfig();
+
+    const cur = getLocalConfigOverrides();
+    if (!cur.treatments) cur.treatments = {};
+    if (!cur.treatments[newTreat.category]) cur.treatments[newTreat.category] = {};
+    cur.treatments[newTreat.category][cleanKey] = newEntry;
+    saveLocalConfigOverrides(cur);
+
     setShowAddTreat(false);
     setNewTreat({ category: 'corundum', key: '', label: '', factor: 1.0 });
-    flash(`Added new treatment: ${newTreat.label}`);
+    flash(`Added new treatment: ${newTreat.label} ✓`);
+
+    try {
+      await fetch(`${API}/api/admin/config`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'treatment',
+          category: newTreat.category,
+          key: cleanKey,
+          value: newEntry
+        })
+      });
+    } catch (err) {
+      console.warn('Cloud add treatment deferred:', err);
+    }
   };
 
   // --------------------------------------------------------------------------
   // CRUD ACTIONS: TRADE COLOR TERMS
   // --------------------------------------------------------------------------
   const saveColorTermArray = async (speciesId: string, newArray: any[]) => {
-    await fetch(`${API}/api/admin/config`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'colorTerm', key: speciesId, value: newArray })
+    setConfigData((prev: any) => {
+      const next = { ...prev };
+      if (!next.colorTerms) next.colorTerms = {};
+      next.colorTerms[speciesId] = newArray;
+      if (!next.overrides) next.overrides = {};
+      if (!next.overrides.colorTerms) next.overrides.colorTerms = {};
+      next.overrides.colorTerms[speciesId] = newArray;
+      return next;
     });
-    await fetchConfig();
-    flash(`Updated prestige color terms for ${speciesId}`);
+
+    const cur = getLocalConfigOverrides();
+    if (!cur.colorTerms) cur.colorTerms = {};
+    cur.colorTerms[speciesId] = newArray;
+    saveLocalConfigOverrides(cur);
+
     setColorTermEdits(p => {
       const n = { ...p };
       delete n[speciesId];
       return n;
     });
+
+    flash(`Saved prestige color terms for ${speciesId} ✓`);
+
+    try {
+      await fetch(`${API}/api/admin/config`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'colorTerm', key: speciesId, value: newArray })
+      });
+    } catch (err) {
+      console.warn('Cloud color term sync deferred:', err);
+    }
   };
 
   const handleAddColorTerm = async () => {
@@ -454,28 +697,82 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, theme, o
   const saveSpeciesMeta = async (speciesId: string) => {
     const edit = speciesEdits[speciesId];
     if (!edit) return;
-    await fetch(`${API}/api/admin/config`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'species', key: speciesId, value: edit })
+
+    setConfigData((prev: any) => {
+      const next = { ...prev };
+      if (next.species?.[speciesId]) {
+        next.species[speciesId] = { ...next.species[speciesId], ...edit };
+      }
+      if (!next.overrides) next.overrides = {};
+      if (!next.overrides.species) next.overrides.species = {};
+      next.overrides.species[speciesId] = { ...(next.overrides.species[speciesId] || {}), ...edit };
+      return next;
     });
-    await fetchConfig();
-    flash(`Saved metadata for ${speciesId}`);
+
+    const cur = getLocalConfigOverrides();
+    if (!cur.species) cur.species = {};
+    cur.species[speciesId] = { ...(cur.species[speciesId] || {}), ...edit };
+    saveLocalConfigOverrides(cur);
+
     setSpeciesEdits(p => {
       const n = { ...p };
       delete n[speciesId];
       return n;
     });
+
+    flash(`Saved metadata for ${speciesId} ✓`);
+
+    try {
+      await fetch(`${API}/api/admin/config`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'species', key: speciesId, value: edit })
+      });
+    } catch (err) {
+      console.warn('Cloud species sync deferred:', err);
+    }
   };
 
   const resetSpeciesMeta = async (speciesId: string) => {
-    await fetch(`${API}/api/admin/config`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'species', key: speciesId })
+    const baseSpec = SPECIES_CATALOG[speciesId];
+    if (!baseSpec) return;
+
+    setConfigData((prev: any) => {
+      const next = { ...prev };
+      if (next.species?.[speciesId]) {
+        next.species[speciesId] = {
+          id: baseSpec.id,
+          name: baseSpec.name,
+          family: baseSpec.family,
+          basePricePerCarat: baseSpec.basePricePerCarat,
+          clarityType: baseSpec.clarityType,
+          treatmentCategory: baseSpec.treatmentCategory,
+          originCategory: baseSpec.originCategory
+        };
+      }
+      if (next.overrides?.species?.[speciesId]) {
+        delete next.overrides.species[speciesId];
+      }
+      return next;
     });
-    await fetchConfig();
-    flash(`Reset metadata for ${speciesId}`);
+
+    const cur = getLocalConfigOverrides();
+    if (cur.species?.[speciesId]) {
+      delete cur.species[speciesId];
+      saveLocalConfigOverrides(cur);
+    }
+
+    flash(`Reset metadata for ${speciesId} to default ✓`);
+
+    try {
+      await fetch(`${API}/api/admin/config`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'species', key: speciesId })
+      });
+    } catch (err) {
+      console.warn('Cloud reset species deferred:', err);
+    }
   };
 
   const handleAddSpecies = async () => {
@@ -484,41 +781,45 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, theme, o
       return;
     }
     const cleanId = newSpecies.id.toLowerCase().replace(/[^a-z0-9_]/g, '_');
-    // 1. Add to species config
-    await fetch(`${API}/api/admin/config`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        type: 'species',
-        key: cleanId,
-        value: {
-          id: cleanId,
-          name: newSpecies.name,
-          family: newSpecies.family,
-          basePricePerCarat: Number(newSpecies.basePricePerCarat),
-          clarityType: newSpecies.clarityType,
-          originCategory: newSpecies.originCategory,
-          treatmentCategory: newSpecies.treatmentCategory
-        }
-      })
+    const newSpecData = {
+      id: cleanId,
+      name: newSpecies.name,
+      family: newSpecies.family,
+      basePricePerCarat: Number(newSpecies.basePricePerCarat),
+      clarityType: newSpecies.clarityType,
+      originCategory: newSpecies.originCategory,
+      treatmentCategory: newSpecies.treatmentCategory
+    };
+
+    setConfigData((prev: any) => {
+      const next = { ...prev };
+      if (!next.species) next.species = {};
+      next.species[cleanId] = newSpecData;
+      if (!next.overrides) next.overrides = {};
+      if (!next.overrides.species) next.overrides.species = {};
+      next.overrides.species[cleanId] = newSpecData;
+      return next;
     });
-    // 2. Add base price
-    await fetch(`${API}/api/admin/override-price`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+
+    const cur = getLocalConfigOverrides();
+    if (!cur.species) cur.species = {};
+    cur.species[cleanId] = newSpecData;
+    saveLocalConfigOverrides(cur);
+
+    setPrices(prev => [
+      {
         speciesId: cleanId,
-        priceData: {
-          basePrice: Number(newSpecies.basePricePerCarat),
-          lowIqr: Math.round(newSpecies.basePricePerCarat * 0.88),
-          highIqr: Math.round(newSpecies.basePricePerCarat * 1.15),
-          trend30d: '+0.0%',
-          clearedTransactionsCount: 10,
-          source: 'Admin Created Species'
-        }
-      })
-    });
-    await Promise.all([fetchPrices(), fetchConfig()]);
+        name: newSpecies.name,
+        family: newSpecies.family,
+        basePrice: Number(newSpecies.basePricePerCarat),
+        isManualOverride: true,
+        lastUpdated: 'New Species Added',
+        source: 'Admin Created Species'
+      },
+      ...prev
+    ]);
+    saveLocalPriceOverride(cleanId, Number(newSpecies.basePricePerCarat));
+
     setShowAddSpecies(false);
     setNewSpecies({
       id: '',
@@ -529,38 +830,106 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, theme, o
       originCategory: 'corundum',
       treatmentCategory: 'corundum'
     });
-    flash(`Added new species: ${newSpecies.name}`);
+    flash(`Added new species: ${newSpecies.name} ✓`);
+
+    try {
+      await fetch(`${API}/api/admin/config`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'species', key: cleanId, value: newSpecData })
+      });
+      await fetch(`${API}/api/admin/override-price`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          speciesId: cleanId,
+          priceData: {
+            basePrice: Number(newSpecies.basePricePerCarat),
+            lowIqr: Math.round(newSpecies.basePricePerCarat * 0.88),
+            highIqr: Math.round(newSpecies.basePricePerCarat * 1.15),
+            trend30d: '+0.0%',
+            clearedTransactionsCount: 10,
+            source: 'Admin Created Species'
+          }
+        })
+      });
+    } catch (err) {
+      console.warn('Cloud add species deferred:', err);
+    }
   };
 
   // --------------------------------------------------------------------------
   // SYSTEM SETTINGS ACTIONS
   // --------------------------------------------------------------------------
   const saveSystem = async () => {
-    await fetch(`${API}/api/admin/config`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ systemSettings: systemEdits })
-    });
-    await fetchConfig();
-    flash('Global system settings saved to Cloud Firestore');
+    setConfigData((prev: any) => ({
+      ...prev,
+      systemSettings: { ...systemEdits }
+    }));
+
+    const cur = getLocalConfigOverrides();
+    cur.systemSettings = { ...systemEdits };
+    saveLocalConfigOverrides(cur);
+
+    flash('Global system settings saved & persisted ✓');
+
+    try {
+      await fetch(`${API}/api/admin/config`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ systemSettings: systemEdits })
+      });
+    } catch (err) {
+      console.warn('Cloud system settings sync deferred:', err);
+    }
   };
 
   const resetSection = async (type: string, name: string) => {
     if (!confirm(`Reset all ${name} back to factory defaults?`)) return;
-    await fetch(`${API}/api/admin/config`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type })
-    });
-    await Promise.all([fetchPrices(), fetchConfig()]);
-    flash(`All ${name} reset to catalog defaults`);
+    const cur = getLocalConfigOverrides();
+    delete cur[type];
+    saveLocalConfigOverrides(cur);
+
+    if (type === 'prices') {
+      clearAllLocalPriceOverrides();
+      setPrices(getInitialPrices());
+    } else {
+      setConfigData((prev: any) => {
+        const base = DEFAULT_CONFIG_DATA as any;
+        return {
+          ...prev,
+          [type]: base[type],
+          overrides: { ...prev.overrides, [type]: undefined }
+        };
+      });
+    }
+    flash(`All ${name} reset to catalog defaults ✓`);
+
+    try {
+      await fetch(`${API}/api/admin/config`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type })
+      });
+    } catch (err) {
+      console.warn('Cloud reset section deferred:', err);
+    }
   };
 
   const resetAll = async () => {
     if (!confirm('Are you sure you want to reset ALL configuration overrides to catalog defaults?')) return;
-    await fetch(`${API}/api/admin/config`, { method: 'DELETE' });
-    await Promise.all([fetchPrices(), fetchConfig()]);
-    flash('All overrides reset to defaults');
+    clearLocalConfigOverrides();
+    clearAllLocalPriceOverrides();
+    setConfigData(getInitialConfigData());
+    setPrices(getInitialPrices());
+    flash('All overrides reset to defaults ✓');
+
+    try {
+      await fetch(`${API}/api/admin/config`, { method: 'DELETE' });
+      await Promise.all([fetchPrices(), fetchConfig()]);
+    } catch (err) {
+      console.warn('Cloud reset deferred:', err);
+    }
   };
 
   // --------------------------------------------------------------------------
@@ -1143,7 +1512,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, theme, o
                             {[-10, 10, 25].map(step => (
                               <button
                                 key={step}
-                                onClick={() => setPriceEdits({ ...priceEdits, [p.speciesId]: Math.round(current * (1 + step / 100)) })}
+                                onClick={() => quickAdjustPrice(p.speciesId, step)}
                                 style={{ padding: '3px 7px', background: 'var(--glass-surface)', border: '1px solid var(--glass-border)', borderRadius: '4px', color: 'var(--text-secondary)', fontSize: '11px', cursor: 'pointer' }}
                               >
                                 {step > 0 ? `+${step}%` : `${step}%`}

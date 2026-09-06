@@ -15,6 +15,7 @@ import { PdfExportButton } from './components/PdfExportButton';
 import { MarketComparables } from './components/MarketComparables';
 import { AdminDashboard } from './components/AdminDashboard';
 import { Sun, Moon, Sliders } from 'lucide-react';
+import { getLocalConfigOverrides, mergeConfigOverrides } from './engine/configSync';
 
 const DEFAULT_CONFIG = {
   species: SPECIES_CATALOG,
@@ -65,12 +66,17 @@ export const App: React.FC = () => {
     return typeof window !== 'undefined' && window.location.pathname.startsWith('/admin');
   });
 
-  // Config State (Initializes immediately with DEFAULT_CONFIG so UI never freezes)
-  const [appConfig, setAppConfig] = useState<any>(DEFAULT_CONFIG);
+  // Config State (Initializes immediately with local overrides + DEFAULT_CONFIG so UI never freezes)
+  const [appConfig, setAppConfig] = useState<any>(() => {
+    const localOverrides = getLocalConfigOverrides();
+    return mergeConfigOverrides(DEFAULT_CONFIG, localOverrides);
+  });
   const [configLoading, setConfigLoading] = useState(false);
   const [marketData, setMarketData] = useState<MarketDailyData | null>(null);
 
   const reloadConfig = useCallback(() => {
+    const localOverrides = getLocalConfigOverrides();
+
     fetch('/api/config')
       .then(res => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -78,14 +84,17 @@ export const App: React.FC = () => {
       })
       .then(data => {
         if (data && data.species) {
-          setAppConfig(data);
-          if (data.systemSettings?.defaultRetailMargin) {
-            setRetailMargin(data.systemSettings.defaultRetailMargin);
+          const merged = mergeConfigOverrides(data, localOverrides);
+          setAppConfig(merged);
+          if (merged.systemSettings?.defaultRetailMargin) {
+            setRetailMargin(merged.systemSettings.defaultRetailMargin);
           }
         }
       })
       .catch(err => {
-        console.warn('Backend config fetch failed, using built-in catalog:', err);
+        console.warn('Backend config fetch failed, using local overrides catalog:', err);
+        const merged = mergeConfigOverrides(DEFAULT_CONFIG, localOverrides);
+        setAppConfig(merged);
       });
 
     MarketDataService.getInstance()

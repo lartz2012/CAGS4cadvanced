@@ -63,32 +63,61 @@ try {
   console.warn('Firestore initialization warning:', e.message);
 }
 
+// Local In-Memory / File Fallback Cache for zero-dependency & offline resilience
+let inMemoryConfigOverrides = {};
+let inMemoryMarketPrices = {};
+
+const localCachePath = path.resolve(__dirname, 'server_cache.json');
+try {
+  if (fs.existsSync(localCachePath)) {
+    const raw = fs.readFileSync(localCachePath, 'utf8');
+    const parsed = JSON.parse(raw);
+    if (parsed.overrides) inMemoryConfigOverrides = parsed.overrides;
+    if (parsed.prices) inMemoryMarketPrices = parsed.prices;
+  }
+} catch (e) {}
+
+function saveLocalCache() {
+  try {
+    fs.writeFileSync(localCachePath, JSON.stringify({
+      overrides: inMemoryConfigOverrides,
+      prices: inMemoryMarketPrices
+    }, null, 2), 'utf8');
+  } catch (e) {}
+}
+
 // -------------------------------------------------------------
 // 1. Market Prices Collection Helper Functions
 // -------------------------------------------------------------
 
 /**
- * Fetch all market price documents from Firestore
+ * Fetch all market price documents from Firestore or local cache
  */
 async function getMarketPrices() {
+  const localRows = Object.values(inMemoryMarketPrices);
   if (!db) {
-    console.warn('Firestore offline, falling back to catalog default prices.');
-    return [];
+    return localRows;
   }
 
   try {
     const snapshot = await db.collection('market_prices').get();
     const rows = [];
+    const seen = new Set();
     snapshot.forEach(doc => {
+      seen.add(doc.id);
       rows.push({
         speciesId: doc.id,
         ...doc.data()
       });
     });
+    // Merge any memory cached prices
+    localRows.forEach(r => {
+      if (!seen.has(r.speciesId)) rows.push(r);
+    });
     return rows;
   } catch (error) {
-    console.error('Error fetching market prices from Firestore:', error.message);
-    return [];
+    console.warn('Error fetching market prices from Firestore, returning local cache:', error.message);
+    return localRows;
   }
 }
 
@@ -96,22 +125,29 @@ async function getMarketPrices() {
  * Update or insert a market price record for a species
  */
 async function updateMarketPrice(speciesId, priceData, isManual = false) {
-  if (!db) throw new Error('Firestore not connected');
+  const dataToSave = {
+    speciesId,
+    basePrice: Number(priceData.basePrice),
+    lowIqr: Number(priceData.lowIqr || Math.round(priceData.basePrice * 0.88)),
+    highIqr: Number(priceData.highIqr || Math.round(priceData.basePrice * 1.15)),
+    trend30d: priceData.trend30d || '+0.0%',
+    clearedTransactionsCount: Number(priceData.clearedTransactionsCount || 50),
+    source: priceData.source || (isManual ? 'Admin Manual Override' : 'Trade Registry Feed'),
+    isManualOverride: isManual ? true : false,
+    lastUpdated: new Date().toISOString()
+  };
+
+  inMemoryMarketPrices[speciesId] = dataToSave;
+  saveLocalCache();
+
+  if (!db) {
+    console.log(`✓ Saved price override for ${speciesId} to local server cache`);
+    return { id: speciesId, changes: 1, cached: true };
+  }
 
   try {
     const docRef = db.collection('market_prices').doc(speciesId);
     const existing = await docRef.get();
-
-    const dataToSave = {
-      basePrice: Number(priceData.basePrice),
-      lowIqr: Number(priceData.lowIqr || Math.round(priceData.basePrice * 0.88)),
-      highIqr: Number(priceData.highIqr || Math.round(priceData.basePrice * 1.15)),
-      trend30d: priceData.trend30d || '+0.0%',
-      clearedTransactionsCount: Number(priceData.clearedTransactionsCount || 50),
-      source: priceData.source || (isManual ? 'Admin Manual Override' : 'Trade Registry Feed'),
-      isManualOverride: isManual ? true : false,
-      lastUpdated: new Date().toISOString()
-    };
 
     if (existing.exists) {
       const current = existing.data();
@@ -133,8 +169,8 @@ async function updateMarketPrice(speciesId, priceData, isManual = false) {
 
     return { id: speciesId, changes: 1 };
   } catch (error) {
-    console.error(`Error updating market price for ${speciesId}:`, error);
-    throw error;
+    console.warn(`Firestore write warning for ${speciesId}, kept in local server cache:`, error.message);
+    return { id: speciesId, changes: 1, cached: true };
   }
 }
 
@@ -142,7 +178,12 @@ async function updateMarketPrice(speciesId, priceData, isManual = false) {
  * Clear a manual override flag for a species and restore catalog baseline price
  */
 async function clearManualOverride(speciesId) {
-  if (!db) throw new Error('Firestore not connected');
+  delete inMemoryMarketPrices[speciesId];
+  saveLocalCache();
+
+  if (!db) {
+    return { changes: 1, cached: true };
+  }
 
   try {
     const { SPECIES_CATALOG } = require('../engine/speciesCatalog');
@@ -158,8 +199,8 @@ async function clearManualOverride(speciesId) {
     });
     return { changes: 1 };
   } catch (error) {
-    console.error(`Error clearing manual override for ${speciesId}:`, error);
-    throw error;
+    console.warn(`Firestore clear warning for ${speciesId}:`, error.message);
+    return { changes: 1, cached: true };
   }
 }
 
@@ -171,18 +212,19 @@ async function clearManualOverride(speciesId) {
  * Read the global config overrides document
  */
 async function readConfigOverrides() {
-  if (!db) return {};
+  if (!db) return inMemoryConfigOverrides;
 
   try {
     const docRef = db.collection('config').doc('overrides');
     const doc = await docRef.get();
     if (doc.exists) {
-      return doc.data();
+      inMemoryConfigOverrides = { ...inMemoryConfigOverrides, ...doc.data() };
+      return inMemoryConfigOverrides;
     }
-    return {};
+    return inMemoryConfigOverrides;
   } catch (error) {
-    console.warn('Note: Could not reach Firestore config overrides, using default catalog:', error.message);
-    return {};
+    console.warn('Note: Could not reach Firestore config overrides, using local cache:', error.message);
+    return inMemoryConfigOverrides;
   }
 }
 
@@ -190,15 +232,21 @@ async function readConfigOverrides() {
  * Save / merge config overrides
  */
 async function writeConfigOverrides(data) {
-  if (!db) throw new Error('Firestore not connected');
+  inMemoryConfigOverrides = { ...inMemoryConfigOverrides, ...data };
+  saveLocalCache();
+
+  if (!db) {
+    console.log('✓ Saved config overrides to local server cache');
+    return true;
+  }
 
   try {
     const docRef = db.collection('config').doc('overrides');
     await docRef.set(data, { merge: true });
     return true;
   } catch (error) {
-    console.error('Error saving config overrides to Firestore:', error);
-    throw error;
+    console.warn('Error saving to Firestore, preserved in local server cache:', error.message);
+    return true;
   }
 }
 
@@ -206,15 +254,18 @@ async function writeConfigOverrides(data) {
  * Reset all config overrides
  */
 async function resetConfigOverrides() {
-  if (!db) throw new Error('Firestore not connected');
+  inMemoryConfigOverrides = {};
+  saveLocalCache();
+
+  if (!db) return true;
 
   try {
     const docRef = db.collection('config').doc('overrides');
     await docRef.set({});
     return true;
   } catch (error) {
-    console.error('Error resetting config overrides:', error);
-    throw error;
+    console.warn('Error resetting config overrides in Firestore:', error.message);
+    return true;
   }
 }
 

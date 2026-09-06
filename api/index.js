@@ -1,5 +1,5 @@
-const app = require('../server/index.js');
+import app from '../server/index.js';
 
-module.exports = (req, res) => {
+export default function handler(req, res) {
   return app(req, res);
-};
+}

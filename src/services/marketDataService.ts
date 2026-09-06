@@ -64,12 +64,50 @@ export class MarketDataService {
         throw new Error(`Failed to load market database from backend: ${response.statusText}`);
       }
       const data: MarketDailyData = await response.json();
-      this.cachedData = data;
+      const merged = this.applyLocalPriceOverrides(data);
+      this.cachedData = merged;
       this.lastFetchTime = now;
-      return data;
+      return merged;
     } catch (err) {
-      console.warn('Could not fetch remote daily market data, using fallback defaults:', err);
-      return this.getFallbackData();
+      console.warn('Could not fetch remote daily market data, using fallback defaults with local overrides:', err);
+      const fallback = this.applyLocalPriceOverrides(this.getFallbackData());
+      return fallback;
+    }
+  }
+
+  private applyLocalPriceOverrides(data: MarketDailyData): MarketDailyData {
+    if (typeof window === 'undefined' || !data || !data.speciesPrices) return data;
+    try {
+      const raw = localStorage.getItem('cags_price_overrides');
+      if (!raw) return data;
+      const overrides = JSON.parse(raw);
+      if (!overrides || Object.keys(overrides).length === 0) return data;
+
+      const updatedSpeciesPrices = { ...data.speciesPrices };
+      for (const [id, price] of Object.entries(overrides)) {
+        const p = Number(price);
+        if (isNaN(p) || p <= 0) continue;
+        if (updatedSpeciesPrices[id]) {
+          updatedSpeciesPrices[id] = {
+            ...updatedSpeciesPrices[id],
+            basePrice: p,
+            isManualOverride: true
+          };
+        } else {
+          updatedSpeciesPrices[id] = {
+            basePrice: p,
+            lowIqr: Math.round(p * 0.88),
+            highIqr: Math.round(p * 1.15),
+            trend30d: '+0.0%',
+            clearedTransactionsCount: 50,
+            source: 'Admin Manual Override',
+            isManualOverride: true
+          };
+        }
+      }
+      return { ...data, speciesPrices: updatedSpeciesPrices };
+    } catch (e) {
+      return data;
     }
   }
 
