@@ -131,7 +131,7 @@ export default function App() {
       <div style={{ maxWidth: '1080px', margin: '0 auto' }}>
         {/* Header */}
         <div style={S.header}>
-          <h1 style={S.title}><Settings size={22} color="var(--accent-cyan, #22d3ee)" /> GemMetrics Admin Control Panel</h1>
+          <h1 style={S.title}><Settings size={22} color="var(--accent-cyan, #22d3ee)" /> CAGS Admin Control Panel</h1>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
             {saved && <span style={{ color: '#50fa7b', fontWeight: 600, fontSize: '13px', minWidth: '140px', textAlign: 'right' }}>{saved}</span>}
             <button style={S.resetBtn} onClick={resetAll}><Trash2 size={13} /> Reset All Overrides</button>

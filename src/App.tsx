@@ -279,8 +279,29 @@ export const App: React.FC = () => {
 
   if (configLoading || !appConfig || !currentSpecies) {
     return (
-      <div style={{ display: 'flex', height: '100vh', justifyContent: 'center', alignItems: 'center', color: 'var(--text-main)' }}>
-        <h2>Loading GemMetrics Engine...</h2>
+      <div style={{ display: 'flex', height: '100vh', justifyContent: 'center', alignItems: 'center', backgroundColor: 'var(--bg-base)' }}>
+        <div className="cags-loader-wrap">
+          <div className="cags-loader-mark">
+            <img src="/gems/Crown.png" alt="CAGS" className="cags-gem-facet" />
+            <img src="/gems/Upper-left.png" alt="" className="cags-gem-facet" />
+            <img src="/gems/Upper-right.png" alt="" className="cags-gem-facet" />
+            <img src="/gems/Right-orange.png" alt="" className="cags-gem-facet" />
+            <img src="/gems/Left-magenta.png" alt="" className="cags-gem-facet" />
+            <img src="/gems/Left-purple.png" alt="" className="cags-gem-facet" />
+            <img src="/gems/Bottom-left-teal.png" alt="" className="cags-gem-facet" />
+            <img src="/gems/Bottom-green.png" alt="" className="cags-gem-facet" />
+            <img src="/gems/Bottom-right-yellow.png" alt="" className="cags-gem-facet" />
+            <img src="/gems/Center.png" alt="" className="cags-gem-facet" />
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <h2 style={{ fontSize: '19px', fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-primary)', margin: '0 0 6px' }}>
+              CAGS Gem Appraisal Suite
+            </h2>
+            <p style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.14em', color: 'var(--accent-cyan)', margin: 0 }}>
+              Ceylon Academy of Gemmological Science
+            </p>
+          </div>
+        </div>
       </div>
     );
   }
@@ -299,20 +320,26 @@ export const App: React.FC = () => {
       <div className="grain-overlay" />
 
       <div className="app-container">
-        {/* Navigation Header (Architectural 12px squircle, NO PILL) */}
+        {/* Navigation Header */}
         <header className="nav-header liquid-card">
           <div className="brand-wrap">
-            <div className="gem-mark" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinejoin="round" strokeLinecap="round">
-                <path d="M6 3h12l4 6-10 12L2 9z" />
-                <path d="M2 9h20" />
-                <path d="M6 3l3 6 3-6 3-6 3-6" />
-                <path d="M9 9l3 12 3-12" />
-              </svg>
+            <div className="cags-gem-logo" aria-label="CAGS Emblem">
+              <img src="/gems/Crown.png" alt="CAGS" className="cags-gem-facet" />
+              <img src="/gems/Upper-left.png" alt="" className="cags-gem-facet" />
+              <img src="/gems/Upper-right.png" alt="" className="cags-gem-facet" />
+              <img src="/gems/Right-orange.png" alt="" className="cags-gem-facet" />
+              <img src="/gems/Left-magenta.png" alt="" className="cags-gem-facet" />
+              <img src="/gems/Left-purple.png" alt="" className="cags-gem-facet" />
+              <img src="/gems/Bottom-left-teal.png" alt="" className="cags-gem-facet" />
+              <img src="/gems/Bottom-green.png" alt="" className="cags-gem-facet" />
+              <img src="/gems/Bottom-right-yellow.png" alt="" className="cags-gem-facet" />
+              <img src="/gems/Center.png" alt="" className="cags-gem-facet" />
             </div>
             <div className="brand-text-block">
-              <span className="brand-name">GemMetrics</span>
-              <span className="brand-sub">GIA 4C Institutional Engine</span>
+              <span className="brand-name">CAGS</span>
+              <span className="nav-div"></span>
+              <span className="brand-tag">Ceylon Academy of Gemmological Science</span>
+              <span className="nav-badge">Gem Appraisal Suite</span>
             </div>
           </div>
 
@@ -341,7 +368,7 @@ export const App: React.FC = () => {
 
             {/* Institutional Metadata Tag */}
             <div className="institutional-tag">
-              FEED // GEMGUIDE B2B · {new Date().toISOString().slice(0, 10)}
+              CAGS INSTITUTIONAL SPECIFICATION · {new Date().toISOString().slice(0, 10)}
             </div>
           </div>
         </header>

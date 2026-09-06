@@ -1,6 +1,6 @@
 :root {
-  --font-main: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-heading: 'Outfit', sans-serif;
+  --font-main: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-heading: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 
   /* Theme: Dark (Default) */
@@ -264,6 +264,98 @@ body {
   text-decoration: none;
 }
 
+/* CAGS 10-piece multi-faceted emblem */
+.cags-gem-logo {
+  width: 26px;
+  height: 40px;
+  position: relative;
+  flex-shrink: 0;
+  aspect-ratio: 1664 / 2582;
+  filter: drop-shadow(0 2px 8px rgba(29, 111, 232, 0.3));
+}
+
+.cags-gem-facet {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+}
+
+.brand-text-block {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.brand-name {
+  font-family: var(--font-heading);
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  color: var(--text-primary);
+}
+
+.nav-div {
+  width: 1px;
+  height: 18px;
+  background: var(--glass-border);
+}
+
+.brand-tag {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.nav-badge {
+  background: rgba(29, 111, 232, 0.18);
+  color: #38bdf8;
+  border: 1px solid rgba(29, 111, 232, 0.35);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 999px;
+  margin-left: 2px;
+}
+
+/* CAGS Animated Loader */
+.cags-loader-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+}
+
+.cags-loader-mark {
+  position: relative;
+  width: 60px;
+  height: 93px;
+  aspect-ratio: 1664 / 2582;
+}
+
+.cags-loader-mark::before {
+  content: "";
+  position: absolute;
+  inset: -40px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 50%, rgba(29, 111, 232, 0.35), transparent 70%);
+  animation: cags-halo 3s ease-in-out infinite;
+}
+
+@keyframes cags-halo {
+  0%, 100% { opacity: 0.4; transform: scale(0.95); }
+  50% { opacity: 0.9; transform: scale(1.08); }
+}
+
 .gem-mark {
   width: 28px;
   height: 28px;
@@ -278,20 +370,6 @@ body {
   width: 100%;
   height: 100%;
   stroke-width: 1.5;
-}
-
-.brand-text-block {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-}
-
-.brand-name {
-  font-family: var(--font-heading);
-  font-size: 19px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: var(--text-primary);
 }
 
 .brand-sub {

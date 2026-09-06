@@ -3,7 +3,7 @@ const path = require('path');
 const fs = require('fs');
 
 async function testApp() {
-  console.log('Testing GemMetrics React Liquid Glass app with Light & Dark Modes...');
+  console.log('Testing CAGS Gem Appraisal Suite React Liquid Glass app with Light & Dark Modes...');
   const browser = await chromium.launch({
     executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
     headless: true
@@ -32,14 +32,29 @@ async function testApp() {
   const ssDir = path.join(__dirname, 'screenshots');
   if (!fs.existsSync(ssDir)) fs.mkdirSync(ssDir);
 
-  // 1. Dark Mode Screenshot
+  // 1. Check title & brand
+  const pageTitle = await page.title();
+  console.log('Page title:', pageTitle);
+  if (!pageTitle.includes('CAGS Gem Appraisal Suite')) {
+    throw new Error(`Unexpected page title: ${pageTitle}`);
+  }
+
+  const brandName = await page.locator('.brand-name').textContent();
+  console.log('Brand name:', brandName);
+  if (brandName.trim() !== 'CAGS') {
+    throw new Error(`Expected brand-name to be CAGS, got: ${brandName}`);
+  }
+
+  const logoVisible = await page.locator('.cags-gem-logo').isVisible();
+  console.log('CAGS Gem Logo visible:', logoVisible);
+  if (!logoVisible) {
+    throw new Error('CAGS Gem logo not visible');
+  }
+
+  // 2. Dark Mode Screenshot
   const darkShot = path.join(ssDir, 'dark_mode.png');
   await page.screenshot({ path: darkShot, fullPage: false });
   console.log('Saved Dark Mode screenshot:', darkShot);
-
-  // 2. Check title & brand
-  const title = await page.locator('.brand-name').textContent();
-  console.log('Brand title:', title);
 
   // 3. Test Presets in Specimen Catalog
   const presets = ['Emerald', 'Ruby', 'Padparadscha', 'Blue Sapphire'];

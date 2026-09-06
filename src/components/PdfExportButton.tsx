@@ -3,6 +3,7 @@ import jsPDF from 'jspdf';
 import { ValuationResult, GemInputParams } from '../engine/pricingModel';
 import { ScrapedMarketListing, MarketDataService } from '../services/marketDataService';
 import { Download, Printer, Eye, X, CheckCircle2, FileText, ExternalLink } from 'lucide-react';
+import { CAGS_LOGO_BASE64 } from '../assets/cagsLogoBase64';
 
 interface PdfExportButtonProps {
   valuation: ValuationResult;
@@ -59,7 +60,7 @@ export const PdfExportButton: React.FC<PdfExportButtonProps> = ({
       format: 'a4'
     });
 
-    const certId = `GM-${Date.now().toString().slice(-8)}`;
+    const certId = `CAGS-${Date.now().toString().slice(-8)}`;
     const dateStr = new Date().toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
@@ -100,7 +101,7 @@ export const PdfExportButton: React.FC<PdfExportButtonProps> = ({
       doc.setFontSize(6.5);
       doc.setTextColor(148, 163, 184);
       doc.text(
-        `GEMMETRICS INSTITUTE OF VALUATION   •   OFFICIAL REPORT #${certId}   •   USPAP & GIA COMPLIANT`,
+        `CEYLON ACADEMY OF GEMMOLOGICAL SCIENCE (CAGS)   •   OFFICIAL REPORT #${certId}   •   USPAP & GIA COMPLIANT`,
         pageWidth / 2,
         pageHeight - 12,
         { align: 'center' }
@@ -113,21 +114,29 @@ export const PdfExportButton: React.FC<PdfExportButtonProps> = ({
     // =========================================================================
     drawCertificateBorder(1);
 
+    // CAGS Gemstone Logo Badges flanking the Header
+    try {
+      doc.addImage(CAGS_LOGO_BASE64, 'PNG', 18, 14.5, 9.6, 14.9);
+      doc.addImage(CAGS_LOGO_BASE64, 'PNG', pageWidth - 18 - 9.6, 14.5, 9.6, 14.9);
+    } catch (err) {
+      console.warn('Could not add logo to PDF:', err);
+    }
+
     // Top Center Header Block
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(16);
-    doc.setTextColor(15, 23, 42); // Deep Navy
-    doc.text('GEMMETRICS INSTITUTE OF VALUATION', pageWidth / 2, 20, { align: 'center' });
+    doc.setFontSize(15);
+    doc.setTextColor(11, 21, 38); // CAGS Deep Navy
+    doc.text('CEYLON ACADEMY OF GEMMOLOGICAL SCIENCE (CAGS)', pageWidth / 2, 20, { align: 'center' });
 
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
+    doc.setFontSize(8.5);
     doc.setTextColor(212, 175, 55); // Gold
     doc.text('OFFICIAL 4C COLORED GEMSTONE APPRAISAL & VALUATION CERTIFICATE', pageWidth / 2, 25.5, { align: 'center' });
 
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7);
+    doc.setFontSize(6.8);
     doc.setTextColor(100, 116, 139);
-    doc.text('GOVERNED BY GIA 4C COLOR SCIENCE & GEMWORLD GEMGUIDE WHOLESALE BENCHMARKS', pageWidth / 2, 29.5, { align: 'center' });
+    doc.text('GOVERNED BY GIA 4C COLOR SCIENCE & CAGS INSTITUTIONAL VALUATION BENCHMARKS', pageWidth / 2, 29.5, { align: 'center' });
 
     // Decorative Center Ribbon Line with Diamond Accent
     doc.setDrawColor(212, 175, 55);
@@ -148,7 +157,7 @@ export const PdfExportButton: React.FC<PdfExportButtonProps> = ({
     doc.text(`CERTIFICATE REF: ${certId}`, 22, 41.2);
     doc.text(`DATE OF APPRAISAL: ${dateStr.toUpperCase()}`, pageWidth / 2, 41.2, { align: 'center' });
     doc.setTextColor(2, 132, 199);
-    doc.text('STATUS: CERTIFIED AUDIT / SECURE', pageWidth - 22, 41.2, { align: 'right' });
+    doc.text('STATUS: CAGS VERIFIED & AUDITED', pageWidth - 22, 41.2, { align: 'right' });
 
     // -------------------------------------------------------------------------
     // SECTION 1: GEMOLOGICAL SPECIFICATIONS & 4C OPTICAL GRADING (Two Columns)
@@ -415,9 +424,9 @@ export const PdfExportButton: React.FC<PdfExportButtonProps> = ({
     doc.circle(sealCenterX, sealCenterY, 11, 'S');
 
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(5);
+    doc.setFontSize(4.8);
     doc.setTextColor(212, 175, 55);
-    doc.text('GEMMETRICS VALUATION LAB', sealCenterX, sealCenterY - 5.5, { align: 'center' });
+    doc.text('CAGS VALUATION LABORATORY', sealCenterX, sealCenterY - 5.5, { align: 'center' });
 
     // 3 Gold Vector Diamonds
     const drawGoldDiamond = (cx: number, cy: number) => {
@@ -429,7 +438,7 @@ export const PdfExportButton: React.FC<PdfExportButtonProps> = ({
     drawGoldDiamond(sealCenterX + 4, sealCenterY - 1);
 
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(5);
+    doc.setFontSize(4.8);
     doc.setTextColor(212, 175, 55);
     doc.text('OFFICIAL SEAL', sealCenterX, sealCenterY + 4, { align: 'center' });
     doc.text('USPAP COMPLIANT', sealCenterX, sealCenterY + 7.5, { align: 'center' });
@@ -446,9 +455,9 @@ export const PdfExportButton: React.FC<PdfExportButtonProps> = ({
     doc.text('M. L. Sterling, GG (GIA), FGA', pageWidth - 40, sigY - 2, { align: 'center' });
 
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(6);
+    doc.setFontSize(5.8);
     doc.setTextColor(100, 116, 139);
-    doc.text('Senior Certified Gemological Appraiser', pageWidth - 40, sigY + 4, { align: 'center' });
+    doc.text('Senior Appraiser, Ceylon Academy of Gemmological Science', pageWidth - 40, sigY + 4, { align: 'center' });
 
     // =========================================================================
     // PAGE 2: EMPIRICAL GROUND TRUTH (SCRAPED COMPARABLES & ADVISORY)
@@ -456,14 +465,22 @@ export const PdfExportButton: React.FC<PdfExportButtonProps> = ({
     doc.addPage();
     drawCertificateBorder(2);
 
+    // CAGS Gemstone Logo Badges flanking Page 2 Header
+    try {
+      doc.addImage(CAGS_LOGO_BASE64, 'PNG', 18, 14.5, 9.6, 14.9);
+      doc.addImage(CAGS_LOGO_BASE64, 'PNG', pageWidth - 18 - 9.6, 14.5, 9.6, 14.9);
+    } catch (err) {
+      console.warn('Could not add logo to PDF:', err);
+    }
+
     // Page 2 Header
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(14);
+    doc.setFontSize(13);
     doc.setTextColor(15, 23, 42);
-    doc.text('EMPIRICAL GROUND TRUTH: ACTIVE MARKET COMPARABLES', pageWidth / 2, 20, { align: 'center' });
+    doc.text('CAGS EMPIRICAL GROUND TRUTH: ACTIVE MARKET COMPARABLES', pageWidth / 2, 20, { align: 'center' });
 
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7.5);
+    doc.setFontSize(7.2);
     doc.setTextColor(100, 116, 139);
     doc.text('ACTUAL LIVE INVENTORY SCRAPED FROM VERIFIED DEALERS & AUCTION BOURSES', pageWidth / 2, 25, { align: 'center' });
 
@@ -645,7 +662,7 @@ export const PdfExportButton: React.FC<PdfExportButtonProps> = ({
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(6.5);
     doc.setTextColor(100, 116, 139);
-    const accText = 'This appraisal document has been algorithmically synthesized in strict conformity with the Uniform Standards of Professional Appraisal Practice (USPAP), GIA Color Science (31-Hue Munsell System), and the Gemworld GemGuide 2D Quality Matrix. Data points are calibrated against active listings on accredited public platforms (The Natural Sapphire Company, Emeralds.com, The Natural Ruby Company, GemRockAuctions, GemPundit).';
+    const accText = 'This appraisal document has been algorithmically synthesized in strict conformity with the Uniform Standards of Professional Appraisal Practice (USPAP), GIA Color Science (31-Hue Munsell System), and Ceylon Academy of Gemmological Science (CAGS) Institutional Valuation Standards. Calibrated against active verified listings on accredited international platforms (The Natural Sapphire Company, Emeralds.com, The Natural Ruby Company, GemRockAuctions, GemPundit).';
     const splitAcc = doc.splitTextToSize(accText, pageWidth - 40);
     doc.text(splitAcc, 20, tableY + 10.5);
 
@@ -658,7 +675,7 @@ export const PdfExportButton: React.FC<PdfExportButtonProps> = ({
     try {
       const { doc, certId } = buildAppraisalPdfDoc();
       const cleanSpecies = valuation.species.name.replace(/[^a-zA-Z0-9]/g, '_');
-      const cleanFileName = `GemMetrics_Appraisal_${cleanSpecies}_${valuation.carat.toFixed(2)}ct_${certId}.pdf`;
+      const cleanFileName = `CAGS_Appraisal_${cleanSpecies}_${valuation.carat.toFixed(2)}ct_${certId}.pdf`;
 
       // Generate ArrayBuffer and create explicit PDF Blob with exact MIME type
       const arrayBuffer = doc.output('arraybuffer');
@@ -684,7 +701,7 @@ export const PdfExportButton: React.FC<PdfExportButtonProps> = ({
       // Fallback
       try {
         const { doc, certId } = buildAppraisalPdfDoc();
-        doc.save(`GemMetrics_Report_${certId}.pdf`);
+        doc.save(`CAGS_Report_${certId}.pdf`);
       } catch (err2) {
         console.error('Fallback save error:', err2);
       }
@@ -801,10 +818,10 @@ export const PdfExportButton: React.FC<PdfExportButtonProps> = ({
                 <FileText size={20} color="#D4AF37" />
                 <div>
                   <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                    GemMetrics Official Appraisal Certificate Preview
+                    CAGS Official Gem Appraisal Certificate Preview
                   </h3>
                   <p style={{ margin: 0, fontSize: '11px', color: 'var(--text-muted)' }}>
-                    2-Page Luxury Certificate • USPAP & GIA Standards
+                    2-Page Luxury Certificate • Ceylon Academy of Gemmological Science (CAGS)
                   </p>
                 </div>
               </div>
