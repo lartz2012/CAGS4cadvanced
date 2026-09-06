@@ -139,15 +139,21 @@ async function updateMarketPrice(speciesId, priceData, isManual = false) {
 }
 
 /**
- * Clear a manual override flag for a species
+ * Clear a manual override flag for a species and restore catalog baseline price
  */
 async function clearManualOverride(speciesId) {
   if (!db) throw new Error('Firestore not connected');
 
   try {
+    const { SPECIES_CATALOG } = require('../engine/speciesCatalog');
+    const defaultPrice = SPECIES_CATALOG[speciesId]?.basePricePerCarat || 500;
     const docRef = db.collection('market_prices').doc(speciesId);
     await docRef.update({
+      basePrice: defaultPrice,
+      lowIqr: Math.round(defaultPrice * 0.88),
+      highIqr: Math.round(defaultPrice * 1.15),
       isManualOverride: false,
+      source: 'Catalog Default (Restored)',
       lastUpdated: new Date().toISOString()
     });
     return { changes: 1 };

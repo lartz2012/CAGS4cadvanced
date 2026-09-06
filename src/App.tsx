@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { SPECIES_CATALOG, GEM_PRESETS } from './engine/speciesCatalog';
 import {
   GemInputParams,
@@ -56,13 +56,44 @@ export const App: React.FC = () => {
     return typeof window !== 'undefined' && window.location.pathname.startsWith('/admin');
   });
 
+  // Config State (Initializes immediately with DEFAULT_CONFIG so UI never freezes)
+  const [appConfig, setAppConfig] = useState<any>(DEFAULT_CONFIG);
+  const [configLoading, setConfigLoading] = useState(false);
+  const [marketData, setMarketData] = useState<MarketDailyData | null>(null);
+
+  const reloadConfig = useCallback(() => {
+    fetch('/api/config')
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then(data => {
+        if (data && data.species) {
+          setAppConfig(data);
+          if (data.systemSettings?.defaultRetailMargin) {
+            setRetailMargin(data.systemSettings.defaultRetailMargin);
+          }
+        }
+      })
+      .catch(err => {
+        console.warn('Backend config fetch failed, using built-in catalog:', err);
+      });
+
+    MarketDataService.getInstance()
+      .getMarketData(true)
+      .then(data => setMarketData(data))
+      .catch(err => console.error('Market data load error:', err));
+  }, []);
+
   useEffect(() => {
     const onPop = () => {
-      setIsAdminView(window.location.pathname.startsWith('/admin'));
+      const isAdmin = window.location.pathname.startsWith('/admin');
+      setIsAdminView(isAdmin);
+      if (!isAdmin) reloadConfig();
     };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
-  }, []);
+  }, [reloadConfig]);
 
   const navigateToAdmin = () => {
     window.history.pushState({}, '', '/admin');
@@ -72,7 +103,12 @@ export const App: React.FC = () => {
   const navigateToApp = () => {
     window.history.pushState({}, '', '/');
     setIsAdminView(false);
+    reloadConfig();
   };
+
+  useEffect(() => {
+    reloadConfig();
+  }, [reloadConfig]);
 
   // Gemological state
   const [speciesId, setSpeciesId] = useState<string>('blue_sapphire');
@@ -100,37 +136,6 @@ export const App: React.FC = () => {
   const [currency, setCurrency] = useState<string>('USD');
   const [viewMode, setViewMode] = useState<'wholesale' | 'retail'>('wholesale');
   const [retailMargin, setRetailMargin] = useState<number>(50);
-  const [marketData, setMarketData] = useState<MarketDailyData | null>(null);
-
-  // Config State (Initializes immediately with DEFAULT_CONFIG so UI never freezes)
-  const [appConfig, setAppConfig] = useState<any>(DEFAULT_CONFIG);
-  const [configLoading, setConfigLoading] = useState(false);
-
-  useEffect(() => {
-    fetch('/api/config')
-      .then(res => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json();
-      })
-      .then(data => {
-        if (data && data.species) {
-          setAppConfig(data);
-          if (data.systemSettings?.defaultRetailMargin) {
-            setRetailMargin(data.systemSettings.defaultRetailMargin);
-          }
-        }
-      })
-      .catch(err => {
-        console.warn('Backend config fetch failed, using built-in catalog:', err);
-      });
-  }, []);
-
-  useEffect(() => {
-    MarketDataService.getInstance()
-      .getMarketData()
-      .then(data => setMarketData(data))
-      .catch(err => console.error('Market data load error:', err));
-  }, []);
 
   const currentSpecies = appConfig?.species?.[speciesId] || (appConfig?.species ? Object.values(appConfig.species)[0] : null);
 
@@ -263,7 +268,13 @@ export const App: React.FC = () => {
   useEffect(() => {
     // 1. Immediate local calculation (0ms response, 100% offline & load resilience)
     try {
-      const immediateResult = calculateGemValuation(valuationParams, {}, appConfig?.overrides || {});
+      const livePrices: Record<string, number> = {};
+      if (marketData?.speciesPrices) {
+        Object.entries(marketData.speciesPrices).forEach(([spId, rec]) => {
+          if (rec?.basePrice) livePrices[spId] = rec.basePrice;
+        });
+      }
+      const immediateResult = calculateGemValuation(valuationParams, livePrices, appConfig?.overrides || {});
       setValuation(immediateResult);
     } catch (e) {
       console.warn('Local calculation note:', e);

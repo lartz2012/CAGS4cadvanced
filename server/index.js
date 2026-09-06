@@ -360,6 +360,29 @@ app.post(['/api/admin/config', '/admin/config'], async (req, res) => {
 
 app.delete(['/api/admin/config', '/admin/config'], async (req, res) => {
   try {
+    const { type, category, key } = req.body || req.query || {};
+    if (type) {
+      const overrides = await readConfigOverrides();
+      if (type === 'species' && key) {
+        if (overrides.species) delete overrides.species[key];
+      } else if (type === 'origin' && category && key) {
+        if (overrides.origins?.[category]) delete overrides.origins[category][key];
+      } else if (type === 'treatment' && category && key) {
+        if (overrides.treatments?.[category]) delete overrides.treatments[category][key];
+      } else if (type === 'origins') {
+        delete overrides.origins;
+      } else if (type === 'treatments') {
+        delete overrides.treatments;
+      } else if (type === 'species_all') {
+        delete overrides.species;
+      } else if (type === 'systemSettings') {
+        delete overrides.systemSettings;
+      } else if (type === 'colorTerms') {
+        delete overrides.colorTerms;
+      }
+      await writeConfigOverrides(overrides);
+      return res.json({ success: true, message: `Override for ${type} reset to defaults.` });
+    }
     await resetConfigOverrides();
     res.json({ success: true, message: 'All config overrides cleared from Firestore.' });
   } catch (err) {

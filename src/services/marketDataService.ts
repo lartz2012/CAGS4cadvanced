@@ -52,9 +52,9 @@ export class MarketDataService {
   /**
    * Fetch real verified market data from daily cache or public API
    */
-  public async getMarketData(): Promise<MarketDailyData> {
+  public async getMarketData(forceRefresh: boolean = false): Promise<MarketDailyData> {
     const now = Date.now();
-    if (this.cachedData && now - this.lastFetchTime < this.CACHE_TTL_MS) {
+    if (!forceRefresh && this.cachedData && now - this.lastFetchTime < this.CACHE_TTL_MS) {
       return this.cachedData;
     }
 

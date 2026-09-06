@@ -518,10 +518,10 @@ export function calculateGemValuation(
   // ----------------------------------------------------------------------
   // 2. GEMGUIDE QUALITY TIER CLASSIFICATION & MATRIX LOOKUP
   // ----------------------------------------------------------------------
-  const hasGrid = !!GEMGUIDE_GRIDS[species.id];
   const grid = GEMGUIDE_GRIDS[species.id] || GEMGUIDE_GRIDS['blue_sapphire'];
-  // If we don't have a hardcoded 96-point matrix for a rare gem, we scale the sapphire matrix by the gem's baseline ratio
-  const scaleFactor = hasGrid ? 1.0 : (species.basePricePerCarat / 500.0);
+  const catalogBaseline = rawSpecies.basePricePerCarat || 500.0;
+  // Proportional scale factor: if admin overrides basePricePerCarat, it scales the grid proportionally
+  const scaleFactor = species.basePricePerCarat / catalogBaseline;
 
   let qualityTier: ValuationResult['qualityTier'] = 'Good Commercial';
   let tierColor = '#38bdf8';
@@ -561,34 +561,74 @@ export function calculateGemValuation(
 
   // Smooth interpolation within tier wholesale range
   const [tierLow, tierHigh] = tierRange;
-  let baseWholesalePerCarat = tierLow + tierProgress * (tierHigh - tierLow);
+  const baseWholesalePerCarat = tierLow + tierProgress * (tierHigh - tierLow);
+
+  // Apply trade color term premium (e.g. Royal Blue, Pigeon's Blood)
+  const colorTermResult = getTradeColorTerm(species.id, params.hue, params.tone, params.saturation, overrides);
+  const colorTermMultiplier = colorTermResult.multiplier || 1.0;
+  const tradeColorTerm = colorTermResult.term || 'Commercial Grade';
+  const colorTermAdjustedWholesale = baseWholesalePerCarat * colorTermMultiplier;
 
   // ----------------------------------------------------------------------
-  // 3. TREATMENT & UNHEATED RARITY ADJUSTMENT
+  // 3. TREATMENT & UNHEATED RARITY ADJUSTMENT (WITH ADMIN OVERRIDES)
   // ----------------------------------------------------------------------
-  const treatCategory = TREATMENT_TABLE[species.treatmentCategory] || TREATMENT_TABLE.generic;
-  const treatData = treatCategory[params.treatment] || Object.values(treatCategory)[0] || { factor: 1.0, label: 'Standard' };
+  const baseTreatCategory = TREATMENT_TABLE[species.treatmentCategory] || TREATMENT_TABLE.generic;
+  const overrideTreatCategory = overrides?.treatments?.[species.treatmentCategory] || {};
+  const treatCategory: Record<string, { factor: number; label: string }> = {};
+  for (const k of Object.keys(baseTreatCategory)) {
+    treatCategory[k] = { ...baseTreatCategory[k] };
+  }
+  for (const k of Object.keys(overrideTreatCategory)) {
+    treatCategory[k] = {
+      ...(treatCategory[k] || { label: k, factor: 1.0 }),
+      ...overrideTreatCategory[k]
+    };
+  }
+  const rawTreatData = treatCategory[params.treatment] || Object.values(treatCategory)[0] || { factor: 1.0, label: 'Standard' };
+  const treatData = {
+    ...rawTreatData,
+    label: rawTreatData.label || params.treatment || 'Standard'
+  };
   let treatmentMultiplier = treatData.factor;
 
   // Unheated Corundum scales non-linearly with carat bracket
   if (species.family === 'Corundum' && params.treatment === 'unheated_cert') {
-    // 0.5-1ct: 1.5x, 1-2ct: 1.7x, 2-3ct: 2.0x, 3-5ct: 2.3x, 5-10ct: 2.8x, 10ct+: 3.4x
     const unheatedCurves = [1.50, 1.70, 2.00, 2.30, 2.80, 3.40];
     treatmentMultiplier = unheatedCurves[bracketIdx] || 2.0;
   }
 
   // ----------------------------------------------------------------------
-  // 4. ORIGIN PROVENANCE ADJUSTMENT
+  // 4. ORIGIN PROVENANCE ADJUSTMENT (WITH ADMIN OVERRIDES)
   // ----------------------------------------------------------------------
-  const originCategory = ORIGIN_TABLE[species.originCategory] || ORIGIN_TABLE.generic;
-  const originData = originCategory[params.origin] || originCategory.unknown || { factor: 1.0, label: 'Standard' };
+  const baseOriginCategory = ORIGIN_TABLE[species.originCategory] || ORIGIN_TABLE.generic;
+  const overrideOriginCategory = overrides?.origins?.[species.originCategory] || {};
+  const originCategory: Record<string, { factor: number; label: string }> = {};
+  for (const k of Object.keys(baseOriginCategory)) {
+    originCategory[k] = { ...baseOriginCategory[k] };
+  }
+  for (const k of Object.keys(overrideOriginCategory)) {
+    originCategory[k] = {
+      ...(originCategory[k] || { label: k, factor: 1.0 }),
+      ...overrideOriginCategory[k]
+    };
+  }
+  const rawOriginData = originCategory[params.origin] || originCategory.unknown || Object.values(originCategory)[0] || { factor: 1.0, label: 'Standard' };
+  const originData = {
+    ...rawOriginData,
+    label: rawOriginData.label || params.origin || 'Standard'
+  };
   const originMultiplier = originData.factor;
 
   // ----------------------------------------------------------------------
-  // 5. CERTIFICATION LIQUIDITY & SPREAD
+  // 5. CERTIFICATION LIQUIDITY & SPREAD (WITH ADMIN OVERRIDES)
   // ----------------------------------------------------------------------
-  const certMap = { 'major': 1.10, 'domestic': 1.00, 'none': 0.88 };
-  const certMultiplier = certMap[params.certification] || 1.0;
+  const systemSettings = overrides?.systemSettings || {};
+  const certMap: Record<string, number> = {
+    'major': systemSettings.certMultiplier?.major ?? 1.10,
+    'domestic': systemSettings.certMultiplier?.domestic ?? 1.00,
+    'none': systemSettings.certMultiplier?.none ?? 0.88
+  };
+  const certMultiplier = certMap[params.certification] ?? 1.0;
 
   // Combined external multiplier
   const combinedMultiplier = originMultiplier * treatmentMultiplier * certMultiplier;
@@ -596,8 +636,7 @@ export function calculateGemValuation(
   // ----------------------------------------------------------------------
   // 6. FINAL WHOLESALE PRICE COMPUTATION
   // ----------------------------------------------------------------------
-  // If customBasePrice was provided from live CRON feed, blend it subtly (max +/-15%)
-  let finalBaseWholesale = baseWholesalePerCarat;
+  let finalBaseWholesale = colorTermAdjustedWholesale;
   if (params.customBasePrice && params.customBasePrice > 0) {
     const liveRatio = Math.max(0.85, Math.min(1.15, params.customBasePrice / (species.basePricePerCarat || 500)));
     finalBaseWholesale *= liveRatio;
@@ -606,7 +645,13 @@ export function calculateGemValuation(
   const wholesaleMidpointPerCarat = Math.round(finalBaseWholesale * combinedMultiplier);
 
   // Confidence spread based on certification
-  const spreadPercent = params.certification === 'major' ? 0.12 : params.certification === 'domestic' ? 0.20 : 0.30;
+  const spreadPercentMap: Record<string, number> = {
+    'major': systemSettings.certSpread?.major ?? 0.12,
+    'domestic': systemSettings.certSpread?.domestic ?? 0.20,
+    'none': systemSettings.certSpread?.none ?? 0.30
+  };
+  const spreadPercent = spreadPercentMap[params.certification] ?? 0.20;
+
   const wholesaleLowPerCarat = Math.round(wholesaleMidpointPerCarat * (1 - spreadPercent));
   const wholesaleHighPerCarat = Math.round(wholesaleMidpointPerCarat * (1 + spreadPercent));
 
@@ -617,7 +662,8 @@ export function calculateGemValuation(
   // ----------------------------------------------------------------------
   // 7. RETAIL REPLACEMENT APPRAISAL PRICING
   // ----------------------------------------------------------------------
-  const retailMargin = params.retailMarginPercent ?? 50;
+  const defaultMargin = systemSettings.defaultRetailMargin ?? 50;
+  const retailMargin = params.retailMarginPercent ?? defaultMargin;
   const retailMultiplier = 1 + (retailMargin / 100);
   const retailMidpointPerCarat = Math.round(wholesaleMidpointPerCarat * retailMultiplier);
   const retailTotalMidpoint = Math.round(wholesaleTotalMidpoint * retailMultiplier);
