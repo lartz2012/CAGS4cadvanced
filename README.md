@@ -22,11 +22,11 @@ The repository is structured as a modern multi-tiered application:
 │   ├── services/                # Market data fetcher & comparable matching service
 │   └── styles/                  # Apple fluid silk wallpaper & liquid glass styling
 │
-├── server/                      # Express Backend API & Market Database
-│   ├── index.js                 # REST API endpoints (/api/market-prices, /api/valuation/calculate, /api/config)
-│   ├── db/                      # SQLite persistence (market_data.sqlite)
+├── server/                      # Express Backend API & Cloud Database
+│   ├── index.js                 # REST API endpoints (/api/market-prices, /api/valuation/calculate, /api/config, /api/appraisals)
+│   ├── db/                      # Firebase Cloud Firestore integration (firebase.js)
 │   ├── engine/                  # Server-side synced valuation engine & catalog
-│   └── config/                  # Admin config overrides (config_overrides.json)
+│   └── seed_firestore.cjs       # Database seeding utility for Cloud Firestore
 │
 ├── admin-dashboard/             # Standalone Administrator Control Panel (React + Vite)
 │   ├── src/                     # Admin interface for editing base prices, origin factors,
@@ -70,13 +70,14 @@ The repository is structured as a modern multi-tiered application:
 * Node.js 18+
 * npm or pnpm
 
-### 1. Backend Service
+### 1. Backend Service (Google Cloud Firestore)
 ```bash
 cd server
 npm install
-node index.js
+npm run seed:firestore   # Populates your Firestore database with all species & matrices
+npm start                # Starts Express server on http://localhost:3001
 ```
-*Backend runs on `http://localhost:3001`.*
+*Backend connects to Google Cloud Firestore using `serviceAccountKey.json` or cloud environment variables.*
 
 ### 2. Main Appraisal Application
 ```bash

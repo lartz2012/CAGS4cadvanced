@@ -42,7 +42,7 @@ async function testApp() {
   console.log('Brand title:', title);
 
   // 3. Test Presets in Specimen Catalog
-  const presets = ['Emerald', 'Paraíba', 'Pink Spinel', 'Blue Sapphire'];
+  const presets = ['Emerald', 'Ruby', 'Padparadscha', 'Blue Sapphire'];
   for (const p of presets) {
     await page.click(`.catalog-tab:has-text("${p}")`);
     await page.waitForTimeout(300);
@@ -79,7 +79,7 @@ async function testApp() {
   // 8. Test PDF Download in Light Mode
   const [download] = await Promise.all([
     page.waitForEvent('download', { timeout: 10000 }).catch(() => null),
-    page.click('button:has-text("Download Luxury Valuation Certificate")')
+    page.click('button:has-text("Download PDF")')
   ]);
 
   if (download) {

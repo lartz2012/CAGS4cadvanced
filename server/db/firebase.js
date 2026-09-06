@@ -1,0 +1,256 @@
+const { initializeApp, cert, getApps } = require('firebase-admin/app');
+const { getFirestore } = require('firebase-admin/firestore');
+const path = require('path');
+const fs = require('fs');
+
+// Initialize Firebase Admin SDK
+if (!getApps().length) {
+  let credential;
+
+  // 1. Check for Service Account JSON string in Environment Variables (for Vercel / Cloud)
+  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    try {
+      const parsed = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+      credential = cert(parsed);
+    } catch (e) {
+      console.warn('Failed to parse FIREBASE_SERVICE_ACCOUNT env var:', e.message);
+    }
+  }
+
+  // 2. Check for individual Environment Variables (Alternative for Vercel)
+  if (!credential && process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY) {
+    credential = cert({
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
+    });
+  }
+
+  // 3. Fallback to local serviceAccountKey.json file (Local Development)
+  if (!credential) {
+    const keyPath = path.resolve(__dirname, '..', 'serviceAccountKey.json');
+    if (fs.existsSync(keyPath)) {
+      credential = cert(require(keyPath));
+      console.log('✓ Firebase Admin initialized with local serviceAccountKey.json');
+    } else {
+      console.error('CRITICAL: No Firebase credentials found! Please provide serviceAccountKey.json or env variables.');
+    }
+  }
+
+  if (credential) {
+    initializeApp({ credential });
+  }
+}
+
+const db = getFirestore();
+
+// -------------------------------------------------------------
+// 1. Market Prices Collection Helper Functions
+// -------------------------------------------------------------
+
+/**
+ * Fetch all market price documents from Firestore
+ */
+async function getMarketPrices() {
+  try {
+    const snapshot = await db.collection('market_prices').get();
+    const rows = [];
+    snapshot.forEach(doc => {
+      rows.push({
+        speciesId: doc.id,
+        ...doc.data()
+      });
+    });
+    return rows;
+  } catch (error) {
+    console.error('Error fetching market prices from Firestore:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update or insert a market price record for a species
+ */
+async function updateMarketPrice(speciesId, priceData, isManual = false) {
+  try {
+    const docRef = db.collection('market_prices').doc(speciesId);
+    const existing = await docRef.get();
+
+    const dataToSave = {
+      basePrice: Number(priceData.basePrice),
+      lowIqr: Number(priceData.lowIqr || Math.round(priceData.basePrice * 0.88)),
+      highIqr: Number(priceData.highIqr || Math.round(priceData.basePrice * 1.15)),
+      trend30d: priceData.trend30d || '+0.0%',
+      clearedTransactionsCount: Number(priceData.clearedTransactionsCount || 50),
+      source: priceData.source || (isManual ? 'Admin Manual Override' : 'Trade Registry Feed'),
+      isManualOverride: isManual ? true : false,
+      lastUpdated: new Date().toISOString()
+    };
+
+    if (existing.exists) {
+      const current = existing.data();
+      // If current has manual override and this update is NOT manual, preserve manual
+      if (current.isManualOverride && !isManual) {
+        return { id: speciesId, status: 'skipped_manual_override_active' };
+      }
+    }
+
+    await docRef.set(dataToSave, { merge: true });
+
+    // Also log to audit_logs
+    await db.collection('audit_logs').add({
+      speciesId,
+      oldPrice: existing.exists ? existing.data().basePrice : null,
+      newPrice: dataToSave.basePrice,
+      isManualOverride: isManual,
+      source: dataToSave.source,
+      timestamp: new Date().toISOString()
+    });
+
+    return { id: speciesId, changes: 1 };
+  } catch (error) {
+    console.error(`Error updating market price for ${speciesId}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Clear a manual override flag for a species
+ */
+async function clearManualOverride(speciesId) {
+  try {
+    const docRef = db.collection('market_prices').doc(speciesId);
+    await docRef.update({
+      isManualOverride: false,
+      lastUpdated: new Date().toISOString()
+    });
+    return { changes: 1 };
+  } catch (error) {
+    console.error(`Error clearing manual override for ${speciesId}:`, error);
+    throw error;
+  }
+}
+
+// -------------------------------------------------------------
+// 2. Global Config & Overrides Helper Functions
+// -------------------------------------------------------------
+
+/**
+ * Read the global config overrides document
+ */
+async function readConfigOverrides() {
+  try {
+    const docRef = db.collection('config').doc('overrides');
+    const doc = await docRef.get();
+    if (doc.exists) {
+      return doc.data();
+    }
+    return {};
+  } catch (error) {
+    console.warn('Error reading config overrides from Firestore, falling back to empty:', error.message);
+    return {};
+  }
+}
+
+/**
+ * Save / merge config overrides
+ */
+async function writeConfigOverrides(data) {
+  try {
+    const docRef = db.collection('config').doc('overrides');
+    await docRef.set(data, { merge: true });
+    return true;
+  } catch (error) {
+    console.error('Error saving config overrides to Firestore:', error);
+    throw error;
+  }
+}
+
+/**
+ * Reset all config overrides
+ */
+async function resetConfigOverrides() {
+  try {
+    const docRef = db.collection('config').doc('overrides');
+    await docRef.set({});
+    return true;
+  } catch (error) {
+    console.error('Error resetting config overrides:', error);
+    throw error;
+  }
+}
+
+// -------------------------------------------------------------
+// 3. Saved Appraisals & Valuations Persistence
+// -------------------------------------------------------------
+
+/**
+ * Save an appraisal valuation result to Firestore
+ */
+async function saveAppraisal(appraisalData) {
+  try {
+    const certId = appraisalData.certificateId || `GM-${Date.now().toString().slice(-8)}`;
+    const docRef = db.collection('appraisals').doc(certId);
+    const record = {
+      ...appraisalData,
+      certificateId: certId,
+      createdAt: new Date().toISOString()
+    };
+    await docRef.set(record);
+    return { certificateId: certId, success: true };
+  } catch (error) {
+    console.error('Error saving appraisal to Firestore:', error);
+    throw error;
+  }
+}
+
+/**
+ * Retrieve a saved appraisal by certificate ID
+ */
+async function getAppraisal(certificateId) {
+  try {
+    const docRef = db.collection('appraisals').doc(certificateId);
+    const doc = await docRef.get();
+    if (!doc.exists) return null;
+    return doc.data();
+  } catch (error) {
+    console.error(`Error retrieving appraisal ${certificateId}:`, error);
+    throw error;
+  }
+}
+
+// -------------------------------------------------------------
+// 4. Market Comparables & Scraped Listings
+// -------------------------------------------------------------
+
+/**
+ * Fetch scraped listings for a species from Firestore
+ */
+async function getMarketListings(speciesId = null) {
+  try {
+    let query = db.collection('market_listings');
+    if (speciesId) {
+      query = query.where('speciesId', '==', speciesId);
+    }
+    const snapshot = await query.get();
+    const listings = [];
+    snapshot.forEach(doc => listings.push({ id: doc.id, ...doc.data() }));
+    return listings;
+  } catch (error) {
+    console.error('Error fetching market listings from Firestore:', error);
+    return [];
+  }
+}
+
+module.exports = {
+  db,
+  getMarketPrices,
+  updateMarketPrice,
+  clearManualOverride,
+  readConfigOverrides,
+  writeConfigOverrides,
+  resetConfigOverrides,
+  saveAppraisal,
+  getAppraisal,
+  getMarketListings
+};

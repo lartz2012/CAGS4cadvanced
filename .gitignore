@@ -18,3 +18,10 @@ pnpm-debug.log*
 *.sln
 *.sw?
 admin-dashboard/node_modules/
+server/node_modules/
+serviceAccountKey.json
+*serviceAccount*.json
+server/serviceAccountKey.json
+*.sqlite
+*.sqlite3
+server/db/*.sqlite
