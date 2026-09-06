@@ -19,6 +19,8 @@ import {
   Filter,
   CheckCircle2,
   Layers,
+  Sun,
+  Moon,
   HelpCircle,
   FolderPlus
 } from 'lucide-react';
@@ -86,9 +88,33 @@ type Tab = 'sandbox' | 'prices' | 'origins' | 'treatments' | 'colorTerms' | 'spe
 
 interface AdminDashboardProps {
   onBack?: () => void;
+  theme?: 'dark' | 'light';
+  onToggleTheme?: () => void;
 }
 
-export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
+export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, theme, onToggleTheme }) => {
+  const [internalTheme, setInternalTheme] = useState<'dark' | 'light'>(() => {
+    if (typeof document !== 'undefined') {
+      const current = document.documentElement.getAttribute('data-theme');
+      if (current === 'light' || current === 'dark') return current;
+    }
+    return theme || 'dark';
+  });
+
+  const activeTheme = theme || internalTheme;
+
+  const handleToggleTheme = () => {
+    if (onToggleTheme) {
+      onToggleTheme();
+    } else {
+      const nextTheme = activeTheme === 'dark' ? 'light' : 'dark';
+      setInternalTheme(nextTheme);
+      document.documentElement.setAttribute('data-theme', nextTheme);
+      try {
+        localStorage.setItem('cags_theme', nextTheme);
+      } catch {}
+    }
+  };
   const [tab, setTab] = useState<Tab>('sandbox');
   const [prices, setPrices] = useState<any[]>(DEFAULT_PRICES);
   const [configData, setConfigData] = useState<any>(DEFAULT_CONFIG_DATA);
@@ -658,6 +684,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
             </span>
           )}
           <button
+            onClick={handleToggleTheme}
+            className="theme-toggle-btn"
+            title={`Switch to ${activeTheme === 'dark' ? 'Light' : 'Dark'} Mode`}
+            aria-label="Toggle color theme"
+            style={{ width: '36px', height: '36px', borderRadius: '8px' }}
+          >
+            {activeTheme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
+          <button
             onClick={resetAll}
             style={{ padding: '8px 14px', background: 'rgba(239,68,68,0.12)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.25)', borderRadius: '8px', fontWeight: 600, fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
           >
@@ -736,7 +771,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
               </div>
 
               {/* Sandbox Input Controls */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px', padding: '16px', background: 'rgba(0,0,0,0.2)', borderRadius: '10px', border: '1px solid var(--glass-border)' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px', padding: '16px', background: 'var(--glass-surface-elevated, rgba(0,0,0,0.2))', borderRadius: '10px', border: '1px solid var(--glass-border)' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: '6px', fontWeight: 600 }}>
                     Species
@@ -747,7 +782,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                     style={{ width: '100%', padding: '8px 10px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '13px' }}
                   >
                     {Object.values(SPECIES_CATALOG).map(sp => (
-                      <option key={sp.id} value={sp.id} style={{ background: '#0f172a', color: '#fff' }}>
+                      <option key={sp.id} value={sp.id} style={{ background: '#0f172a', color: 'var(--input-text)' }}>
                         {sp.name} ({sp.family})
                       </option>
                     ))}
@@ -790,10 +825,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                     onChange={e => setSimQualityPreset(e.target.value as any)}
                     style={{ width: '100%', padding: '8px 10px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '13px' }}
                   >
-                    <option value="extra_fine" style={{ background: '#0f172a' }}>Superb / Extra Fine (Connoisseur)</option>
-                    <option value="fine" style={{ background: '#0f172a' }}>Fine Trade (Investment Grade)</option>
-                    <option value="good" style={{ background: '#0f172a' }}>Good Commercial</option>
-                    <option value="commercial" style={{ background: '#0f172a' }}>Commercial Trade</option>
+                    <option value="extra_fine">Superb / Extra Fine (Connoisseur)</option>
+                    <option value="fine">Fine Trade (Investment Grade)</option>
+                    <option value="good">Good Commercial</option>
+                    <option value="commercial">Commercial Trade</option>
                   </select>
                 </div>
 
@@ -811,7 +846,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                       ORIGIN_TABLE[simSpecies.originCategory] ||
                       ORIGIN_TABLE.generic
                     ).map(([k, orig]: [string, any]) => (
-                      <option key={k} value={k} style={{ background: '#0f172a' }}>
+                      <option key={k} value={k}>
                         {orig.label} (×{orig.factor?.toFixed(2)})
                       </option>
                     ))}
@@ -832,7 +867,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                       TREATMENT_TABLE[simSpecies.treatmentCategory] ||
                       TREATMENT_TABLE.generic
                     ).map(([k, trt]: [string, any]) => (
-                      <option key={k} value={k} style={{ background: '#0f172a' }}>
+                      <option key={k} value={k}>
                         {trt.label} (×{trt.factor?.toFixed(2)})
                       </option>
                     ))}
@@ -848,9 +883,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                     onChange={e => setSimCert(e.target.value as any)}
                     style={{ width: '100%', padding: '8px 10px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '13px' }}
                   >
-                    <option value="major" style={{ background: '#0f172a' }}>Tier 1 Lab (GIA / SSEF / Gübelin)</option>
-                    <option value="domestic" style={{ background: '#0f172a' }}>Domestic Accredited Lab</option>
-                    <option value="none" style={{ background: '#0f172a' }}>No Formal Laboratory Report</option>
+                    <option value="major">Tier 1 Lab (GIA / SSEF / Gübelin)</option>
+                    <option value="domestic">Domestic Accredited Lab</option>
+                    <option value="none">No Formal Laboratory Report</option>
                   </select>
                 </div>
               </div>
@@ -859,7 +894,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
               {baselineResult && adjustedResult && (
                 <div style={{ marginTop: '20px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
                   {/* Baseline Card */}
-                  <div style={{ padding: '16px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)', borderRadius: '10px' }}>
+                  <div style={{ padding: '16px', background: 'var(--glass-surface, rgba(255,255,255,0.03))', border: '1px solid var(--glass-border)', borderRadius: '10px' }}>
                     <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>
                       Catalog Baseline (Uncalibrated)
                     </div>
@@ -913,7 +948,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                   </div>
 
                   {/* Multipliers Breakdown */}
-                  <div style={{ padding: '16px', background: 'rgba(0,0,0,0.25)', border: '1px solid var(--glass-border)', borderRadius: '10px' }}>
+                  <div style={{ padding: '16px', background: 'var(--glass-surface-elevated, rgba(0,0,0,0.25))', border: '1px solid var(--glass-border)', borderRadius: '10px' }}>
                     <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>
                       Calculation Multipliers Active
                     </div>
@@ -1082,7 +1117,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                               min="1"
                               value={priceEdits[p.speciesId]}
                               onChange={e => setPriceEdits({ ...priceEdits, [p.speciesId]: Number(e.target.value) })}
-                              style={{ width: '110px', padding: '6px 8px', background: 'var(--input-bg)', border: '1px solid var(--accent-cyan)', borderRadius: '6px', color: '#fff', fontFamily: 'monospace', fontSize: '14px', fontWeight: 700 }}
+                              style={{ width: '110px', padding: '6px 8px', background: 'var(--input-bg)', border: '1px solid var(--accent-cyan)', borderRadius: '6px', color: 'var(--input-text)', fontFamily: 'monospace', fontSize: '14px', fontWeight: 700 }}
                             />
                           ) : (
                             <span style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: '15px', color: p.isManualOverride ? '#38bdf8' : 'var(--text-primary)' }}>
@@ -1207,10 +1242,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                     <select
                       value={newOrigin.category}
                       onChange={e => setNewOrigin({ ...newOrigin, category: e.target.value })}
-                      style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: '#fff', fontSize: '12px' }}
+                      style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: 'var(--input-text)', fontSize: '12px' }}
                     >
                       {Object.keys(ORIGIN_TABLE).map(cat => (
-                        <option key={cat} value={cat} style={{ background: '#0f172a' }}>{CATEGORY_NAMES[cat] || cat}</option>
+                        <option key={cat} value={cat}>{CATEGORY_NAMES[cat] || cat}</option>
                       ))}
                     </select>
                   </div>
@@ -1222,7 +1257,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                       placeholder="e.g. vietnam_lucyen"
                       value={newOrigin.key}
                       onChange={e => setNewOrigin({ ...newOrigin, key: e.target.value })}
-                      style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: '#fff', fontSize: '12px' }}
+                      style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: 'var(--input-text)', fontSize: '12px' }}
                     />
                   </div>
 
@@ -1233,7 +1268,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                       placeholder="e.g. Vietnam (Luc Yen Valley)"
                       value={newOrigin.label}
                       onChange={e => setNewOrigin({ ...newOrigin, label: e.target.value })}
-                      style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: '#fff', fontSize: '12px' }}
+                      style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: 'var(--input-text)', fontSize: '12px' }}
                     />
                   </div>
 
@@ -1246,7 +1281,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                       max="10"
                       value={newOrigin.factor}
                       onChange={e => setNewOrigin({ ...newOrigin, factor: Number(e.target.value) })}
-                      style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: '#fff', fontSize: '12px' }}
+                      style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: 'var(--input-text)', fontSize: '12px' }}
                     />
                   </div>
                 </div>
@@ -1264,7 +1299,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
 
             {/* Origin Categories */}
             {Object.entries((configData?.origins || DEFAULT_CONFIG_DATA.origins) as Record<string, Record<string, any>>).map(([cat, entries]) => (
-              <div key={cat} style={{ marginBottom: '2rem', background: 'rgba(0,0,0,0.15)', padding: '16px', borderRadius: '10px', border: '1px solid var(--glass-border)' }}>
+              <div key={cat} style={{ marginBottom: '2rem', background: 'var(--glass-surface-elevated, rgba(0,0,0,0.15))', padding: '16px', borderRadius: '10px', border: '1px solid var(--glass-border)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                   <h4 style={{ margin: 0, color: 'var(--accent-cyan)', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
                     {CATEGORY_NAMES[cat] || `${cat} Origins`}
@@ -1290,7 +1325,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                         const ed = originEdits[cat]?.[key];
 
                         return (
-                          <tr key={key} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                          <tr key={key} style={{ borderBottom: '1px solid var(--glass-border)' }}>
                             <td style={{ padding: '10px 8px' }}>
                               <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '13px' }}>{entry.label}</div>
                               <div style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>Key: <code>{key}</code></div>
@@ -1301,7 +1336,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                             </td>
 
                             <td style={{ padding: '10px 8px' }}>
-                              <span style={{ fontFamily: 'monospace', fontWeight: 800, color: entry.factor > 1.0 ? '#10b981' : entry.factor < 0.95 ? '#ef4444' : '#fff' }}>
+                              <span style={{ fontFamily: 'monospace', fontWeight: 800, color: entry.factor > 1.0 ? '#10b981' : entry.factor < 0.95 ? '#ef4444' : 'var(--text-primary)' }}>
                                 ×{entry.factor?.toFixed(2)}
                               </span>
                               {hasOverride && (
@@ -1325,7 +1360,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                                     [cat]: { ...p[cat], [key]: { factor: parseFloat(e.target.value) } }
                                   }))
                                 }
-                                style={{ width: '80px', padding: '5px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: '#fff', fontFamily: 'monospace', fontSize: '13px' }}
+                                style={{ width: '80px', padding: '5px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: 'var(--input-text)', fontFamily: 'monospace', fontSize: '13px' }}
                               />
                             </td>
 
@@ -1401,10 +1436,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                     <select
                       value={newTreat.category}
                       onChange={e => setNewTreat({ ...newTreat, category: e.target.value })}
-                      style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: '#fff', fontSize: '12px' }}
+                      style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: 'var(--input-text)', fontSize: '12px' }}
                     >
                       {Object.keys(TREATMENT_TABLE).map(cat => (
-                        <option key={cat} value={cat} style={{ background: '#0f172a' }}>{CATEGORY_NAMES[cat] || cat}</option>
+                        <option key={cat} value={cat}>{CATEGORY_NAMES[cat] || cat}</option>
                       ))}
                     </select>
                   </div>
@@ -1416,7 +1451,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                       placeholder="e.g. low_temp_heat"
                       value={newTreat.key}
                       onChange={e => setNewTreat({ ...newTreat, key: e.target.value })}
-                      style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: '#fff', fontSize: '12px' }}
+                      style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: 'var(--input-text)', fontSize: '12px' }}
                     />
                   </div>
 
@@ -1427,7 +1462,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                       placeholder="e.g. Low-Temperature Heat (Mild)"
                       value={newTreat.label}
                       onChange={e => setNewTreat({ ...newTreat, label: e.target.value })}
-                      style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: '#fff', fontSize: '12px' }}
+                      style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: 'var(--input-text)', fontSize: '12px' }}
                     />
                   </div>
 
@@ -1440,7 +1475,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                       max="10"
                       value={newTreat.factor}
                       onChange={e => setNewTreat({ ...newTreat, factor: Number(e.target.value) })}
-                      style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: '#fff', fontSize: '12px' }}
+                      style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: 'var(--input-text)', fontSize: '12px' }}
                     />
                   </div>
                 </div>
@@ -1458,7 +1493,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
 
             {/* Treatment Categories */}
             {Object.entries((configData?.treatments || DEFAULT_CONFIG_DATA.treatments) as Record<string, Record<string, any>>).map(([cat, entries]) => (
-              <div key={cat} style={{ marginBottom: '2rem', background: 'rgba(0,0,0,0.15)', padding: '16px', borderRadius: '10px', border: '1px solid var(--glass-border)' }}>
+              <div key={cat} style={{ marginBottom: '2rem', background: 'var(--glass-surface-elevated, rgba(0,0,0,0.15))', padding: '16px', borderRadius: '10px', border: '1px solid var(--glass-border)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                   <h4 style={{ margin: 0, color: 'var(--accent-cyan)', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
                     {CATEGORY_NAMES[cat] || `${cat} Treatments`}
@@ -1484,7 +1519,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                         const ed = treatEdits[cat]?.[key];
 
                         return (
-                          <tr key={key} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                          <tr key={key} style={{ borderBottom: '1px solid var(--glass-border)' }}>
                             <td style={{ padding: '10px 8px' }}>
                               <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '13px' }}>{entry.label}</div>
                               <div style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>Key: <code>{key}</code></div>
@@ -1495,7 +1530,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                             </td>
 
                             <td style={{ padding: '10px 8px' }}>
-                              <span style={{ fontFamily: 'monospace', fontWeight: 800, color: entry.factor > 1.0 ? '#10b981' : entry.factor < 0.9 ? '#ef4444' : '#fff' }}>
+                              <span style={{ fontFamily: 'monospace', fontWeight: 800, color: entry.factor > 1.0 ? '#10b981' : entry.factor < 0.9 ? '#ef4444' : 'var(--text-primary)' }}>
                                 ×{entry.factor?.toFixed(2)}
                               </span>
                               {hasOverride && (
@@ -1519,7 +1554,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                                     [cat]: { ...p[cat], [key]: { factor: parseFloat(e.target.value) } }
                                   }))
                                 }
-                                style={{ width: '80px', padding: '5px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: '#fff', fontFamily: 'monospace', fontSize: '13px' }}
+                                style={{ width: '80px', padding: '5px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: 'var(--input-text)', fontFamily: 'monospace', fontSize: '13px' }}
                               />
                             </td>
 
@@ -1595,10 +1630,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                     <select
                       value={newColorTerm.speciesId}
                       onChange={e => setNewColorTerm({ ...newColorTerm, speciesId: e.target.value })}
-                      style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: '#fff', fontSize: '12px' }}
+                      style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: 'var(--input-text)', fontSize: '12px' }}
                     >
                       {Object.values(SPECIES_CATALOG).map(sp => (
-                        <option key={sp.id} value={sp.id} style={{ background: '#0f172a' }}>{sp.name}</option>
+                        <option key={sp.id} value={sp.id}>{sp.name}</option>
                       ))}
                     </select>
                   </div>
@@ -1610,7 +1645,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                       placeholder="e.g. Peacock Blue"
                       value={newColorTerm.term}
                       onChange={e => setNewColorTerm({ ...newColorTerm, term: e.target.value })}
-                      style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: '#fff', fontSize: '12px' }}
+                      style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: 'var(--input-text)', fontSize: '12px' }}
                     />
                   </div>
 
@@ -1623,7 +1658,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                       max="5.0"
                       value={newColorTerm.multiplier}
                       onChange={e => setNewColorTerm({ ...newColorTerm, multiplier: Number(e.target.value) })}
-                      style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: '#fff', fontSize: '12px' }}
+                      style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: 'var(--input-text)', fontSize: '12px' }}
                     />
                   </div>
 
@@ -1632,10 +1667,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                     <select
                       value={newColorTerm.premium ? 'yes' : 'no'}
                       onChange={e => setNewColorTerm({ ...newColorTerm, premium: e.target.value === 'yes' })}
-                      style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: '#fff', fontSize: '12px' }}
+                      style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: 'var(--input-text)', fontSize: '12px' }}
                     >
-                      <option value="yes" style={{ background: '#0f172a' }}>Yes (Prestige Certified)</option>
-                      <option value="no" style={{ background: '#0f172a' }}>No (Standard / Commercial)</option>
+                      <option value="yes">Yes (Prestige Certified)</option>
+                      <option value="no">No (Standard / Commercial)</option>
                     </select>
                   </div>
                 </div>
@@ -1658,7 +1693,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
               const edTerms = colorTermEdits[speciesId] || displayTerms;
 
               return (
-                <div key={speciesId} style={{ marginBottom: '2rem', background: 'rgba(0,0,0,0.18)', border: '1px solid var(--glass-border)', padding: '16px', borderRadius: '10px' }}>
+                <div key={speciesId} style={{ marginBottom: '2rem', background: 'var(--glass-surface-elevated, rgba(0,0,0,0.18))', border: '1px solid var(--glass-border)', padding: '16px', borderRadius: '10px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                     <div>
                       <h4 style={{ margin: 0, color: 'var(--accent-cyan)', fontSize: '14px', fontWeight: 700 }}>
@@ -1688,7 +1723,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                       </thead>
                       <tbody>
                         {edTerms.map((t: any, idx: number) => (
-                          <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                          <tr key={idx} style={{ borderBottom: '1px solid var(--glass-border)' }}>
                             <td style={{ padding: '10px 8px', fontWeight: 600, color: 'var(--text-primary)' }}>
                               {t.term}
                             </td>
@@ -1704,7 +1739,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                                   nw[idx] = { ...nw[idx], multiplier: parseFloat(e.target.value) };
                                   setColorTermEdits(p => ({ ...p, [speciesId]: nw }));
                                 }}
-                                style={{ width: '80px', padding: '5px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: '#fff', fontFamily: 'monospace', fontSize: '13px', fontWeight: 700 }}
+                                style={{ width: '80px', padding: '5px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: 'var(--input-text)', fontFamily: 'monospace', fontSize: '13px', fontWeight: 700 }}
                               />
                             </td>
                             <td style={{ padding: '10px 8px' }}>
@@ -1792,7 +1827,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                       placeholder="e.g. grandidierite"
                       value={newSpecies.id}
                       onChange={e => setNewSpecies({ ...newSpecies, id: e.target.value })}
-                      style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: '#fff', fontSize: '12px' }}
+                      style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: 'var(--input-text)', fontSize: '12px' }}
                     />
                   </div>
 
@@ -1803,7 +1838,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                       placeholder="e.g. Grandidierite"
                       value={newSpecies.name}
                       onChange={e => setNewSpecies({ ...newSpecies, name: e.target.value })}
-                      style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: '#fff', fontSize: '12px' }}
+                      style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: 'var(--input-text)', fontSize: '12px' }}
                     />
                   </div>
 
@@ -1814,7 +1849,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                       placeholder="e.g. Silicate"
                       value={newSpecies.family}
                       onChange={e => setNewSpecies({ ...newSpecies, family: e.target.value })}
-                      style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: '#fff', fontSize: '12px' }}
+                      style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: 'var(--input-text)', fontSize: '12px' }}
                     />
                   </div>
 
@@ -1824,7 +1859,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                       type="number"
                       value={newSpecies.basePricePerCarat}
                       onChange={e => setNewSpecies({ ...newSpecies, basePricePerCarat: Number(e.target.value) })}
-                      style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: '#fff', fontSize: '12px' }}
+                      style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: 'var(--input-text)', fontSize: '12px' }}
                     />
                   </div>
 
@@ -1833,11 +1868,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                     <select
                       value={newSpecies.clarityType}
                       onChange={e => setNewSpecies({ ...newSpecies, clarityType: e.target.value as any })}
-                      style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: '#fff', fontSize: '12px' }}
+                      style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: 'var(--input-text)', fontSize: '12px' }}
                     >
-                      <option value="I" style={{ background: '#0f172a' }}>Type I (Aquamarine, Tanzanite - Strict)</option>
-                      <option value="II" style={{ background: '#0f172a' }}>Type II (Sapphire, Ruby, Spinel - Standard)</option>
-                      <option value="III" style={{ background: '#0f172a' }}>Type III (Emerald - Tolerant)</option>
+                      <option value="I">Type I (Aquamarine, Tanzanite - Strict)</option>
+                      <option value="II">Type II (Sapphire, Ruby, Spinel - Standard)</option>
+                      <option value="III">Type III (Emerald - Tolerant)</option>
                     </select>
                   </div>
 
@@ -1846,10 +1881,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                     <select
                       value={newSpecies.originCategory}
                       onChange={e => setNewSpecies({ ...newSpecies, originCategory: e.target.value })}
-                      style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: '#fff', fontSize: '12px' }}
+                      style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: 'var(--input-text)', fontSize: '12px' }}
                     >
                       {Object.keys(ORIGIN_TABLE).map(cat => (
-                        <option key={cat} value={cat} style={{ background: '#0f172a' }}>{CATEGORY_NAMES[cat] || cat}</option>
+                        <option key={cat} value={cat}>{CATEGORY_NAMES[cat] || cat}</option>
                       ))}
                     </select>
                   </div>
@@ -1859,10 +1894,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                     <select
                       value={newSpecies.treatmentCategory}
                       onChange={e => setNewSpecies({ ...newSpecies, treatmentCategory: e.target.value })}
-                      style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: '#fff', fontSize: '12px' }}
+                      style={{ width: '100%', padding: '6px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: 'var(--input-text)', fontSize: '12px' }}
                     >
                       {Object.keys(TREATMENT_TABLE).map(cat => (
-                        <option key={cat} value={cat} style={{ background: '#0f172a' }}>{CATEGORY_NAMES[cat] || cat}</option>
+                        <option key={cat} value={cat}>{CATEGORY_NAMES[cat] || cat}</option>
                       ))}
                     </select>
                   </div>
@@ -1908,7 +1943,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                     const hasOvr = !!configData?.overrides?.species?.[key];
 
                     return (
-                      <tr key={key} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                      <tr key={key} style={{ borderBottom: '1px solid var(--glass-border)' }}>
                         <td style={{ padding: '10px 8px' }}>
                           <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{entry.name}</div>
                           <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{entry.family} · <code>{key}</code></div>
@@ -1918,11 +1953,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                           <select
                             value={ed.clarityType ?? entry.clarityType}
                             onChange={e => setSpeciesEdits(p => ({ ...p, [key]: { ...p[key], clarityType: e.target.value } }))}
-                            style={{ padding: '5px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: '#fff', fontSize: '12px' }}
+                            style={{ padding: '5px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: 'var(--input-text)', fontSize: '12px' }}
                           >
-                            <option value="I" style={{ background: '#0f172a' }}>Type I (Aquamarine, Tanzanite)</option>
-                            <option value="II" style={{ background: '#0f172a' }}>Type II (Sapphire, Ruby, Spinel)</option>
-                            <option value="III" style={{ background: '#0f172a' }}>Type III (Emerald)</option>
+                            <option value="I">Type I (Aquamarine, Tanzanite)</option>
+                            <option value="II">Type II (Sapphire, Ruby, Spinel)</option>
+                            <option value="III">Type III (Emerald)</option>
                           </select>
                         </td>
 
@@ -1933,7 +1968,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                             style={{ padding: '5px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: 'var(--accent-cyan)', fontSize: '12px' }}
                           >
                             {Object.keys(ORIGIN_TABLE).map(cat => (
-                              <option key={cat} value={cat} style={{ background: '#0f172a', color: '#fff' }}>{CATEGORY_NAMES[cat] || cat}</option>
+                              <option key={cat} value={cat} style={{ background: '#0f172a', color: 'var(--input-text)' }}>{CATEGORY_NAMES[cat] || cat}</option>
                             ))}
                           </select>
                         </td>
@@ -1945,7 +1980,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                             style={{ padding: '5px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: '#f59e0b', fontSize: '12px' }}
                           >
                             {Object.keys(TREATMENT_TABLE).map(cat => (
-                              <option key={cat} value={cat} style={{ background: '#0f172a', color: '#fff' }}>{CATEGORY_NAMES[cat] || cat}</option>
+                              <option key={cat} value={cat} style={{ background: '#0f172a', color: 'var(--input-text)' }}>{CATEGORY_NAMES[cat] || cat}</option>
                             ))}
                           </select>
                         </td>
@@ -2019,7 +2054,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                   max="300"
                   value={systemEdits.defaultRetailMargin ?? 50}
                   onChange={e => setSystemEdits({ ...systemEdits, defaultRetailMargin: Number(e.target.value) })}
-                  style={{ width: '90px', padding: '6px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: '#fff', fontFamily: 'monospace', fontSize: '14px', fontWeight: 700 }}
+                  style={{ width: '90px', padding: '6px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: 'var(--input-text)', fontFamily: 'monospace', fontSize: '14px', fontWeight: 700 }}
                 />
                 <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>%</span>
               </div>
@@ -2035,7 +2070,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                 ['domestic', 'Domestic Accredited Laboratory Report', 1.00],
                 ['none', 'No Formal Laboratory Certificate', 0.88]
               ].map(([cert, label, def]) => (
-                <div key={cert as string} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                <div key={cert as string} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid var(--glass-border)' }}>
                   <div>
                     <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>{label as string}</div>
                     <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Baseline default: ×{(def as number).toFixed(2)}</div>
@@ -2052,7 +2087,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                         certMultiplier: { ...(systemEdits.certMultiplier || {}), [cert as string]: parseFloat(e.target.value) }
                       })
                     }
-                    style={{ width: '90px', padding: '6px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: '#fff', fontFamily: 'monospace', fontSize: '13px', fontWeight: 700 }}
+                    style={{ width: '90px', padding: '6px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: 'var(--input-text)', fontFamily: 'monospace', fontSize: '13px', fontWeight: 700 }}
                   />
                 </div>
               ))}
@@ -2068,7 +2103,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                 ['domestic', 'Domestic Lab Spread', 0.20],
                 ['none', 'No Report Spread', 0.30]
               ].map(([cert, label, def]) => (
-                <div key={cert as string} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                <div key={cert as string} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid var(--glass-border)' }}>
                   <div>
                     <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>{label as string}</div>
                     <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
@@ -2087,7 +2122,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack }) => {
                         certSpread: { ...(systemEdits.certSpread || {}), [cert as string]: parseFloat(e.target.value) }
                       })
                     }
-                    style={{ width: '90px', padding: '6px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: '#fff', fontFamily: 'monospace', fontSize: '13px', fontWeight: 700 }}
+                    style={{ width: '90px', padding: '6px 8px', background: 'var(--input-bg)', border: '1px solid var(--input-border)', borderRadius: '6px', color: 'var(--input-text)', fontFamily: 'monospace', fontSize: '13px', fontWeight: 700 }}
                   />
                 </div>
               ))}

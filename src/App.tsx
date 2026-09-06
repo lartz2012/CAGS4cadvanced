@@ -41,10 +41,19 @@ const CURRENCIES: Record<string, { symbol: string; rate: number }> = {
 
 export const App: React.FC = () => {
   // Theme state: dark / light mode
-  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('cags_theme') as 'dark' | 'light';
+      if (saved === 'light' || saved === 'dark') return saved;
+    }
+    return 'dark';
+  });
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
+    try {
+      localStorage.setItem('cags_theme', theme);
+    } catch {}
   }, [theme]);
 
   const toggleTheme = () => {
@@ -351,7 +360,11 @@ export const App: React.FC = () => {
           <div className="wallpaper-wave wave-3" />
         </div>
         <div className="grain-overlay" />
-        <AdminDashboard onBack={navigateToApp} />
+        <AdminDashboard
+          onBack={navigateToApp}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+        />
       </>
     );
   }

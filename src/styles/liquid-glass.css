@@ -628,6 +628,7 @@ body {
   cursor: pointer;
 }
 
+select option,
 .glass-select option {
   background: var(--bg-base);
   color: var(--text-primary);
