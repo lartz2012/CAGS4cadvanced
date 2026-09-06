@@ -59,7 +59,7 @@ export class MarketDataService {
     }
 
     try {
-      const response = await fetch('http://localhost:3001/api/market-prices');
+      const response = await fetch('/api/market-prices');
       if (!response.ok) {
         throw new Error(`Failed to load market database from backend: ${response.statusText}`);
       }

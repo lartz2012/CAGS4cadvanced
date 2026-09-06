@@ -67,7 +67,7 @@ export const App: React.FC = () => {
   const [configLoading, setConfigLoading] = useState(true);
 
   useEffect(() => {
-    fetch('http://localhost:3001/api/config')
+    fetch('/api/config')
       .then(res => res.json())
       .then(data => {
         setAppConfig(data);
@@ -220,7 +220,7 @@ export const App: React.FC = () => {
   useEffect(() => {
     const handler = setTimeout(async () => {
       try {
-        const response = await fetch('http://localhost:3001/api/valuation/calculate', {
+        const response = await fetch('/api/valuation/calculate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(valuationParams)

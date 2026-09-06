@@ -361,8 +361,8 @@ cron.schedule('0 */6 * * *', () => {
   runDataAggregationJob();
 });
 
-// Start Server
-if (process.env.NODE_ENV !== 'test') {
+// Start Server (Only in standalone node environment, not in Vercel serverless)
+if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
   app.listen(PORT, () => {
     console.log(`Market Data Backend Service running on port ${PORT}`);
     console.log(`- Database: Google Cloud Firestore (Project: cagsadvance)`);
