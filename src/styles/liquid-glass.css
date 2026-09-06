@@ -436,6 +436,32 @@ body {
   transform: translateY(-1px);
 }
 
+/* Admin Console Header Button */
+.admin-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  color: var(--text-primary);
+  border-radius: 6px;
+  padding: 0 12px;
+  height: 34px;
+  font-family: var(--font-main);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+}
+
+.admin-nav-btn:hover {
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+  background: rgba(34, 211, 238, 0.1);
+  transform: translateY(-1px);
+}
+
 /* =========================================================================
    4. Specimen Catalog Bar (Architectural Segmented Rail, NO PILL BADGES)
    ========================================================================= */

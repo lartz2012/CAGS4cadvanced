@@ -13,7 +13,8 @@ import { GlassCard } from './components/GlassCard';
 import { ColorPicker } from './components/ColorPicker';
 import { PdfExportButton } from './components/PdfExportButton';
 import { MarketComparables } from './components/MarketComparables';
-import { Sun, Moon } from 'lucide-react';
+import { AdminDashboard } from './components/AdminDashboard';
+import { Sun, Moon, Sliders } from 'lucide-react';
 
 const DEFAULT_CONFIG = {
   species: SPECIES_CATALOG,
@@ -48,6 +49,29 @@ export const App: React.FC = () => {
 
   const toggleTheme = () => {
     setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
+  };
+
+  // Admin routing state
+  const [isAdminView, setIsAdminView] = useState<boolean>(() => {
+    return typeof window !== 'undefined' && window.location.pathname.startsWith('/admin');
+  });
+
+  useEffect(() => {
+    const onPop = () => {
+      setIsAdminView(window.location.pathname.startsWith('/admin'));
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
+  const navigateToAdmin = () => {
+    window.history.pushState({}, '', '/admin');
+    setIsAdminView(true);
+  };
+
+  const navigateToApp = () => {
+    window.history.pushState({}, '', '/');
+    setIsAdminView(false);
   };
 
   // Gemological state
@@ -306,6 +330,21 @@ export const App: React.FC = () => {
     );
   }
 
+  if (isAdminView) {
+    return (
+      <>
+        {/* Apple Fluid Silk Wallpaper */}
+        <div className="apple-wallpaper">
+          <div className="wallpaper-wave wave-1" />
+          <div className="wallpaper-wave wave-2" />
+          <div className="wallpaper-wave wave-3" />
+        </div>
+        <div className="grain-overlay" />
+        <AdminDashboard onBack={navigateToApp} />
+      </>
+    );
+  }
+
   const availableOrigins = appConfig.origins?.[currentSpecies.originCategory] || appConfig.origins?.generic || {};
   const availableTreatments = appConfig.treatments?.[currentSpecies.treatmentCategory] || appConfig.treatments?.generic || {};
 
@@ -344,6 +383,17 @@ export const App: React.FC = () => {
           </div>
 
           <div className="header-meta">
+            {/* Admin Console Navigation Button */}
+            <button
+              onClick={navigateToAdmin}
+              className="admin-nav-btn"
+              title="Open CAGS Admin Console"
+              aria-label="Admin Console"
+            >
+              <Sliders size={13} />
+              <span>Admin</span>
+            </button>
+
             {/* Theme Toggle: Dark / Light Mode */}
             <button
               onClick={toggleTheme}
