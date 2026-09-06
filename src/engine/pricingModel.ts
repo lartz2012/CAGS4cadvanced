@@ -39,6 +39,8 @@ export interface ValuationResult {
   clarityScore: number;
   cutScore: number;
   compositeQualityScore: number; // 0 to 100
+  tradeColorTerm?: string;
+  colorTermMultiplier?: number;
   bracketLabel: string;
   originMultiplier: number;
   treatmentMultiplier: number;
@@ -363,11 +365,98 @@ export function getCaratBracket(carat: number): { index: number; label: string }
   return { index: CARAT_BRACKETS.length - 1, label: CARAT_BRACKETS[CARAT_BRACKETS.length - 1].label };
 }
 
+export interface TradeColorTermEntry {
+  term: string;
+  hueMin: number;
+  hueMax: number;
+  toneMin: number;
+  toneMax: number;
+  satMin: number;
+  satMax: number;
+  multiplier: number;
+  premium: boolean;
+}
+
+export const TRADE_COLOR_TERMS: Record<string, TradeColorTermEntry[]> = {
+  'blue_sapphire': [
+    { term: 'Royal Blue', hueMin: 205, hueMax: 225, toneMin: 68, toneMax: 80, satMin: 80, satMax: 100, multiplier: 1.35, premium: true },
+    { term: 'Cornflower Blue', hueMin: 218, hueMax: 240, toneMin: 50, toneMax: 68, satMin: 70, satMax: 90, multiplier: 1.25, premium: true },
+    { term: 'Peacock Blue', hueMin: 195, hueMax: 210, toneMin: 58, toneMax: 75, satMin: 75, satMax: 95, multiplier: 1.15, premium: true },
+    { term: 'Fine Blue', hueMin: 190, hueMax: 245, toneMin: 40, toneMax: 85, satMin: 60, satMax: 100, multiplier: 1.0, premium: false },
+    { term: 'Commercial Blue', hueMin: 170, hueMax: 260, toneMin: 25, toneMax: 100, satMin: 20, satMax: 100, multiplier: 0.82, premium: false },
+  ],
+  'ruby': [
+    { term: "Pigeon's Blood", hueMin: 348, hueMax: 360, toneMin: 65, toneMax: 80, satMin: 85, satMax: 100, multiplier: 1.50, premium: true },
+    { term: "Pigeon's Blood", hueMin: 0, hueMax: 8, toneMin: 65, toneMax: 80, satMin: 85, satMax: 100, multiplier: 1.50, premium: true },
+    { term: 'Vivid Red', hueMin: 348, hueMax: 360, toneMin: 58, toneMax: 78, satMin: 75, satMax: 100, multiplier: 1.20, premium: true },
+    { term: 'Vivid Red', hueMin: 0, hueMax: 12, toneMin: 58, toneMax: 78, satMin: 75, satMax: 100, multiplier: 1.20, premium: true },
+    { term: 'Pinkish-Red', hueMin: 340, hueMax: 358, toneMin: 55, toneMax: 72, satMin: 65, satMax: 85, multiplier: 1.05, premium: false },
+    { term: 'Purplish-Red', hueMin: 320, hueMax: 348, toneMin: 50, toneMax: 80, satMin: 50, satMax: 100, multiplier: 0.85, premium: false },
+    { term: 'Commercial Red', hueMin: 0, hueMax: 360, toneMin: 0, toneMax: 100, satMin: 0, satMax: 100, multiplier: 0.80, premium: false },
+  ],
+  'emerald': [
+    { term: 'Vivid Colombian Green', hueMin: 138, hueMax: 155, toneMin: 62, toneMax: 76, satMin: 80, satMax: 100, multiplier: 1.30, premium: true },
+    { term: 'Fine Emerald Green', hueMin: 130, hueMax: 158, toneMin: 55, toneMax: 78, satMin: 70, satMax: 95, multiplier: 1.10, premium: true },
+    { term: 'Yellowish-Green', hueMin: 110, hueMax: 138, toneMin: 40, toneMax: 75, satMin: 50, satMax: 100, multiplier: 0.85, premium: false },
+    { term: 'Bluish-Green', hueMin: 155, hueMax: 175, toneMin: 50, toneMax: 80, satMin: 60, satMax: 100, multiplier: 0.90, premium: false },
+    { term: 'Commercial Green', hueMin: 100, hueMax: 180, toneMin: 0, toneMax: 100, satMin: 0, satMax: 100, multiplier: 0.78, premium: false },
+  ],
+  'padparadscha': [
+    { term: 'True Padparadscha', hueMin: 5, hueMax: 25, toneMin: 50, toneMax: 68, satMin: 68, satMax: 90, multiplier: 1.40, premium: true },
+    { term: 'Near-Padparadscha', hueMin: 355, hueMax: 35, toneMin: 45, toneMax: 72, satMin: 55, satMax: 85, multiplier: 1.10, premium: true },
+    { term: 'Orange-Pink Sapphire', hueMin: 0, hueMax: 360, toneMin: 0, toneMax: 100, satMin: 0, satMax: 100, multiplier: 0.90, premium: false },
+  ],
+  'paraiba': [
+    { term: 'Neon Electric Turquoise', hueMin: 168, hueMax: 188, toneMin: 52, toneMax: 68, satMin: 88, satMax: 100, multiplier: 1.45, premium: true },
+    { term: 'Fine Paraíba Blue', hueMin: 185, hueMax: 200, toneMin: 50, toneMax: 70, satMin: 78, satMax: 100, multiplier: 1.20, premium: true },
+    { term: 'Paraíba Green', hueMin: 155, hueMax: 175, toneMin: 45, toneMax: 75, satMin: 70, satMax: 100, multiplier: 1.00, premium: false },
+    { term: 'Commercial Blue-Green', hueMin: 0, hueMax: 360, toneMin: 0, toneMax: 100, satMin: 0, satMax: 100, multiplier: 0.85, premium: false },
+  ],
+  'alexandrite': [
+    { term: 'Strong Color Change', hueMin: 100, hueMax: 165, toneMin: 55, toneMax: 75, satMin: 70, satMax: 100, multiplier: 1.50, premium: true },
+    { term: 'Moderate Color Change', hueMin: 100, hueMax: 165, toneMin: 45, toneMax: 80, satMin: 55, satMax: 85, multiplier: 1.15, premium: true },
+    { term: 'Weak Color Change', hueMin: 0, hueMax: 360, toneMin: 0, toneMax: 100, satMin: 0, satMax: 100, multiplier: 0.85, premium: false },
+  ],
+};
+
+export function getTradeColorTerm(
+  speciesId: string,
+  hue: number,
+  tone: number,
+  saturation: number,
+  overrides: any = null
+): { term: string | null; multiplier: number; premium: boolean } {
+  const terms: TradeColorTermEntry[] = overrides?.colorTerms?.[speciesId] || TRADE_COLOR_TERMS[speciesId];
+  if (!terms) return { term: null, multiplier: 1.0, premium: false };
+
+  for (const entry of terms) {
+    const hueMatch = entry.hueMin <= entry.hueMax
+      ? hue >= entry.hueMin && hue <= entry.hueMax
+      : hue >= entry.hueMin || hue <= entry.hueMax;
+    const toneMatch = tone >= entry.toneMin && tone <= entry.toneMax;
+    const satMatch = saturation >= entry.satMin && saturation <= entry.satMax;
+    if (hueMatch && toneMatch && satMatch) {
+      return { term: entry.term, multiplier: entry.multiplier, premium: entry.premium };
+    }
+  }
+  return { term: 'Commercial Grade', multiplier: 0.80, premium: false };
+}
+
 /**
  * GemGuide 2D Quality Matrix Valuation Engine
  */
-export function calculateGemValuation(params: GemInputParams): ValuationResult {
-  const species = SPECIES_CATALOG[params.speciesId] || SPECIES_CATALOG['blue_sapphire'];
+export function calculateGemValuation(
+  params: GemInputParams,
+  livePrices?: Record<string, number>,
+  overrides?: any
+): ValuationResult {
+  const rawSpecies = SPECIES_CATALOG[params.speciesId] || SPECIES_CATALOG['blue_sapphire'];
+  const species = { ...rawSpecies };
+  if (livePrices && livePrices[species.id]) {
+    species.basePricePerCarat = livePrices[species.id];
+  } else if (overrides?.species?.[species.id]?.basePricePerCarat) {
+    species.basePricePerCarat = overrides.species[species.id].basePricePerCarat;
+  }
   const carat = Math.max(0.05, params.carat || 1.0);
   const { index: bracketIdx, label: bracketLabel } = getCaratBracket(carat);
 

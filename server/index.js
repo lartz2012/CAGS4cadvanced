@@ -24,11 +24,11 @@ app.use(cors());
 app.use(express.json());
 
 // -----------------------------------------------------
-// 1. PUBLIC API (Consumed by React Frontend)
+// 1. PUBLIC API (Dual Route Matching for Local + Vercel)
 // -----------------------------------------------------
 
-// GET /api/market-prices — Live prices from Cloud Firestore
-app.get('/api/market-prices', async (req, res) => {
+// GET /api/market-prices or /market-prices
+app.get(['/api/market-prices', '/market-prices'], async (req, res) => {
   try {
     const rows = await getMarketPrices();
     
@@ -46,13 +46,27 @@ app.get('/api/market-prices', async (req, res) => {
       };
     });
 
-    // Also fetch real comparable market listings from Firestore
+    // Populate missing species from SPECIES_CATALOG defaults
+    for (const [id, spec] of Object.entries(SPECIES_CATALOG)) {
+      if (!speciesPrices[id]) {
+        speciesPrices[id] = {
+          basePrice: spec.basePricePerCarat,
+          lowIqr: Math.round(spec.basePricePerCarat * 0.88),
+          highIqr: Math.round(spec.basePricePerCarat * 1.15),
+          trend30d: '+0.0%',
+          clearedTransactionsCount: 50,
+          source: 'Catalog Baseline',
+          isManualOverride: false
+        };
+      }
+    }
+
     const scrapedListings = await getMarketListings();
 
     const marketDailyData = {
-      version: '5.0.0-firestore',
+      version: '5.1.0-universal',
       lastUpdated: new Date().toISOString(),
-      provider: 'Google Cloud Firestore Verified Bourse Registry',
+      provider: 'Verified Trade Registries & Live Scraped Listings',
       clearinghouses: [
         'The Natural Sapphire Company Public Inventory',
         'Emeralds.com Verified Inventory',
@@ -60,22 +74,22 @@ app.get('/api/market-prices', async (req, res) => {
       ],
       marketIndices: { overallColoredGemIndex: 145.2 },
       speciesPrices: speciesPrices,
-      scrapedListings: scrapedListings
+      scrapedListings: scrapedListings || []
     };
 
     res.json(marketDailyData);
   } catch (err) {
-    console.error('Error fetching market prices from Firestore:', err);
+    console.error('Error in market-prices handler:', err);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
-// GET /api/market-listings — Scraped comparables
-app.get('/api/market-listings', async (req, res) => {
+// GET /api/market-listings or /market-listings
+app.get(['/api/market-listings', '/market-listings'], async (req, res) => {
   try {
     const { speciesId } = req.query;
     const listings = await getMarketListings(speciesId);
-    res.json(listings);
+    res.json(listings || []);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -84,11 +98,11 @@ app.get('/api/market-listings', async (req, res) => {
 // -----------------------------------------------------
 // 1.5 VALUATION ENGINE API (Server-Side Synced & Persistent)
 // -----------------------------------------------------
-app.post('/api/valuation/calculate', async (req, res) => {
+app.post(['/api/valuation/calculate', '/valuation/calculate'], async (req, res) => {
   try {
     const params = req.body;
     
-    // Fetch live base prices from Firestore
+    // Fetch live base prices from Firestore (falls back to empty if offline)
     const rows = await getMarketPrices();
     const livePrices = {};
     rows.forEach(r => livePrices[r.speciesId] = r.basePrice);
@@ -97,12 +111,11 @@ app.post('/api/valuation/calculate', async (req, res) => {
     const overrides = await readConfigOverrides();
     const result = calculateGemValuation(params, livePrices, overrides);
 
-    // Persist valuation to Firestore if requested (or assign a tracking certificateId)
     const certId = params.certificateId || `GM-${Date.now().toString().slice(-8)}`;
     result.certificateId = certId;
 
     if (params.persist !== false) {
-      await saveAppraisal({
+      saveAppraisal({
         certificateId: certId,
         inputParams: params,
         valuationResult: result,
@@ -119,8 +132,8 @@ app.post('/api/valuation/calculate', async (req, res) => {
   }
 });
 
-// GET /api/appraisals/:id — Retrieve saved appraisal report by certificate ID
-app.get('/api/appraisals/:id', async (req, res) => {
+// GET /api/appraisals/:id or /appraisals/:id
+app.get(['/api/appraisals/:id', '/appraisals/:id'], async (req, res) => {
   try {
     const appraisal = await getAppraisal(req.params.id);
     if (!appraisal) {
@@ -136,8 +149,7 @@ app.get('/api/appraisals/:id', async (req, res) => {
 // 2. ADMIN API (Used by Admin Dashboard)
 // -----------------------------------------------------
 
-// Get raw DB rows for the admin panel, merged with the catalog so all species are visible
-app.get('/api/admin/prices', async (req, res) => {
+app.get(['/api/admin/prices', '/admin/prices'], async (req, res) => {
   try {
     const rows = await getMarketPrices();
     const dbPricesMap = {};
@@ -163,23 +175,21 @@ app.get('/api/admin/prices', async (req, res) => {
   }
 });
 
-// Manually override a price in Firestore
-app.post('/api/admin/override-price', async (req, res) => {
+app.post(['/api/admin/override-price', '/admin/override-price'], async (req, res) => {
   const { speciesId, priceData } = req.body;
   if (!speciesId || !priceData) {
     return res.status(400).json({ error: 'Missing speciesId or priceData' });
   }
 
   try {
-    await updateMarketPrice(speciesId, priceData, true); // true = isManual
-    res.json({ success: true, message: `Manual override set for ${speciesId} in Firestore` });
+    await updateMarketPrice(speciesId, priceData, true);
+    res.json({ success: true, message: `Manual override set for ${speciesId}` });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Clear manual override
-app.post('/api/admin/clear-override', async (req, res) => {
+app.post(['/api/admin/clear-override', '/admin/clear-override'], async (req, res) => {
   const { speciesId } = req.body;
   if (!speciesId) {
     return res.status(400).json({ error: 'Missing speciesId' });
@@ -193,8 +203,7 @@ app.post('/api/admin/clear-override', async (req, res) => {
   }
 });
 
-// Force refresh
-app.post('/api/admin/force-refresh', async (req, res) => {
+app.post(['/api/admin/force-refresh', '/admin/force-refresh'], async (req, res) => {
   try {
     await runDataAggregationJob();
     res.json({ success: true, message: 'Data refresh check completed.' });
@@ -204,13 +213,12 @@ app.post('/api/admin/force-refresh', async (req, res) => {
 });
 
 // -----------------------------------------------------
-// 4. DYNAMIC CONFIG API (Synced with Cloud Firestore)
+// 4. DYNAMIC CONFIG API (Never Fails: Always Returns Valid Config)
 // -----------------------------------------------------
 
-// GET /api/config — consumed by frontend on load
-app.get('/api/config', async (req, res) => {
+app.get(['/api/config', '/config'], async (req, res) => {
   try {
-    const overrides = await readConfigOverrides();
+    const overrides = (await readConfigOverrides().catch(() => ({}))) || {};
 
     // Merge origin table with any admin overrides
     const mergedOrigins = {};
@@ -264,17 +272,29 @@ app.get('/api/config', async (req, res) => {
       treatments: mergedTreatments,
       species: mergedSpecies,
       colorTerms: mergedColorTerms,
-      systemSettings
+      systemSettings,
+      overrides
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('Error in /api/config fallback handler:', err);
+    // Absolute safety fallback: return unmerged master catalog
+    res.json({
+      origins: ORIGIN_TABLE,
+      treatments: TREATMENT_TABLE,
+      species: SPECIES_CATALOG,
+      colorTerms: TRADE_COLOR_TERMS,
+      systemSettings: {
+        defaultRetailMargin: 50,
+        certSpread: { major: 0.12, domestic: 0.20, none: 0.30 },
+        certMultiplier: { major: 1.10, domestic: 1.00, none: 0.88 }
+      }
+    });
   }
 });
 
-// GET /api/admin/config — returns current raw config + overrides for admin view
-app.get('/api/admin/config', async (req, res) => {
+app.get(['/api/admin/config', '/admin/config'], async (req, res) => {
   try {
-    const overrides = await readConfigOverrides();
+    const overrides = (await readConfigOverrides().catch(() => ({}))) || {};
     res.json({
       origins: ORIGIN_TABLE,
       treatments: TREATMENT_TABLE,
@@ -300,8 +320,7 @@ app.get('/api/admin/config', async (req, res) => {
   }
 });
 
-// POST /api/admin/config — admin sets overrides in Firestore
-app.post('/api/admin/config', async (req, res) => {
+app.post(['/api/admin/config', '/admin/config'], async (req, res) => {
   try {
     const { type, category, key, value, systemSettings } = req.body;
     const overrides = await readConfigOverrides();
@@ -339,8 +358,7 @@ app.post('/api/admin/config', async (req, res) => {
   }
 });
 
-// DELETE /api/admin/config — reset overrides in Firestore
-app.delete('/api/admin/config', async (req, res) => {
+app.delete(['/api/admin/config', '/admin/config'], async (req, res) => {
   try {
     await resetConfigOverrides();
     res.json({ success: true, message: 'All config overrides cleared from Firestore.' });
@@ -354,7 +372,6 @@ app.delete('/api/admin/config', async (req, res) => {
 // -----------------------------------------------------
 async function runDataAggregationJob() {
   console.log(`[${new Date().toISOString()}] Running market data aggregation job...`);
-  console.log(`[${new Date().toISOString()}] Using Cloud Firestore as verified price authority.`);
 }
 
 cron.schedule('0 */6 * * *', () => {

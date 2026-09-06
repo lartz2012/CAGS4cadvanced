@@ -1,8 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { GEM_PRESETS } from './engine/speciesCatalog';
+import { SPECIES_CATALOG, GEM_PRESETS } from './engine/speciesCatalog';
 import {
   GemInputParams,
-  ValuationResult
+  ValuationResult,
+  calculateGemValuation,
+  ORIGIN_TABLE,
+  TREATMENT_TABLE,
+  TRADE_COLOR_TERMS
 } from './engine/pricingModel';
 import { MarketDataService, MarketDailyData } from './services/marketDataService';
 import { GlassCard } from './components/GlassCard';
@@ -10,6 +14,18 @@ import { ColorPicker } from './components/ColorPicker';
 import { PdfExportButton } from './components/PdfExportButton';
 import { MarketComparables } from './components/MarketComparables';
 import { Sun, Moon } from 'lucide-react';
+
+const DEFAULT_CONFIG = {
+  species: SPECIES_CATALOG,
+  origins: ORIGIN_TABLE,
+  treatments: TREATMENT_TABLE,
+  colorTerms: TRADE_COLOR_TERMS,
+  systemSettings: {
+    defaultRetailMargin: 50,
+    certSpread: { major: 0.12, domestic: 0.20, none: 0.30 },
+    certMultiplier: { major: 1.10, domestic: 1.00, none: 0.88 }
+  }
+};
 
 const CURRENCIES: Record<string, { symbol: string; rate: number }> = {
   USD: { symbol: '$', rate: 1.0 },
@@ -62,23 +78,26 @@ export const App: React.FC = () => {
   const [retailMargin, setRetailMargin] = useState<number>(50);
   const [marketData, setMarketData] = useState<MarketDailyData | null>(null);
 
-  // Config State
-  const [appConfig, setAppConfig] = useState<any>(null);
-  const [configLoading, setConfigLoading] = useState(true);
+  // Config State (Initializes immediately with DEFAULT_CONFIG so UI never freezes)
+  const [appConfig, setAppConfig] = useState<any>(DEFAULT_CONFIG);
+  const [configLoading, setConfigLoading] = useState(false);
 
   useEffect(() => {
     fetch('/api/config')
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
       .then(data => {
-        setAppConfig(data);
-        if (data.systemSettings?.defaultRetailMargin) {
-          setRetailMargin(data.systemSettings.defaultRetailMargin);
+        if (data && data.species) {
+          setAppConfig(data);
+          if (data.systemSettings?.defaultRetailMargin) {
+            setRetailMargin(data.systemSettings.defaultRetailMargin);
+          }
         }
-        setConfigLoading(false);
       })
       .catch(err => {
-        console.error('Failed to fetch config:', err);
-        setConfigLoading(false);
+        console.warn('Backend config fetch failed, using built-in catalog:', err);
       });
   }, []);
 
@@ -218,6 +237,15 @@ export const App: React.FC = () => {
   ]);
 
   useEffect(() => {
+    // 1. Immediate local calculation (0ms response, 100% offline & load resilience)
+    try {
+      const immediateResult = calculateGemValuation(valuationParams, {}, appConfig?.overrides || {});
+      setValuation(immediateResult);
+    } catch (e) {
+      console.warn('Local calculation note:', e);
+    }
+
+    // 2. Server-Side sync with Firestore base prices
     const handler = setTimeout(async () => {
       try {
         const response = await fetch('/api/valuation/calculate', {
@@ -227,15 +255,17 @@ export const App: React.FC = () => {
         });
         if (response.ok) {
           const data = await response.json();
-          setValuation(data);
+          if (data && data.wholesaleTotalMidpoint) {
+            setValuation(data);
+          }
         }
       } catch (err) {
-        console.error('Failed to sync valuation with backend:', err);
+        // Gracefully retains local calculation
       }
     }, 300); // 300ms debounce
 
     return () => clearTimeout(handler);
-  }, [valuationParams]);
+  }, [valuationParams, appConfig]);
 
   const currentRate = (marketData as any)?.fxRates?.[currency] || CURRENCIES[currency]?.rate || 1.0;
   const formatMoney = (usdAmount: number) => {

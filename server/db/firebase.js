@@ -10,8 +10,11 @@ if (!getApps().length) {
   // 1. Check for Service Account JSON string in Environment Variables (for Vercel / Cloud)
   if (process.env.FIREBASE_SERVICE_ACCOUNT) {
     try {
-      const parsed = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+      const parsed = typeof process.env.FIREBASE_SERVICE_ACCOUNT === 'string'
+        ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
+        : process.env.FIREBASE_SERVICE_ACCOUNT;
       credential = cert(parsed);
+      console.log('✓ Firebase Admin initialized with FIREBASE_SERVICE_ACCOUNT environment variable');
     } catch (e) {
       console.warn('Failed to parse FIREBASE_SERVICE_ACCOUNT env var:', e.message);
     }
@@ -19,11 +22,16 @@ if (!getApps().length) {
 
   // 2. Check for individual Environment Variables (Alternative for Vercel)
   if (!credential && process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY) {
-    credential = cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
-    });
+    try {
+      credential = cert({
+        projectId: process.env.FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
+      });
+      console.log('✓ Firebase Admin initialized with individual FIREBASE_* env variables');
+    } catch (e) {
+      console.warn('Failed to parse individual FIREBASE_* env vars:', e.message);
+    }
   }
 
   // 3. Fallback to local serviceAccountKey.json file (Local Development)
@@ -33,16 +41,27 @@ if (!getApps().length) {
       credential = cert(require(keyPath));
       console.log('✓ Firebase Admin initialized with local serviceAccountKey.json');
     } else {
-      console.error('CRITICAL: No Firebase credentials found! Please provide serviceAccountKey.json or env variables.');
+      console.warn('⚠️ No Firebase credentials detected. Falling back to built-in catalog data.');
     }
   }
 
   if (credential) {
-    initializeApp({ credential });
+    try {
+      initializeApp({ credential });
+    } catch (e) {
+      console.warn('Firebase initializeApp error:', e.message);
+    }
   }
 }
 
-const db = getFirestore();
+let db = null;
+try {
+  if (getApps().length) {
+    db = getFirestore();
+  }
+} catch (e) {
+  console.warn('Firestore initialization warning:', e.message);
+}
 
 // -------------------------------------------------------------
 // 1. Market Prices Collection Helper Functions
@@ -52,6 +71,11 @@ const db = getFirestore();
  * Fetch all market price documents from Firestore
  */
 async function getMarketPrices() {
+  if (!db) {
+    console.warn('Firestore offline, falling back to catalog default prices.');
+    return [];
+  }
+
   try {
     const snapshot = await db.collection('market_prices').get();
     const rows = [];
@@ -63,8 +87,8 @@ async function getMarketPrices() {
     });
     return rows;
   } catch (error) {
-    console.error('Error fetching market prices from Firestore:', error);
-    throw error;
+    console.error('Error fetching market prices from Firestore:', error.message);
+    return [];
   }
 }
 
@@ -72,6 +96,8 @@ async function getMarketPrices() {
  * Update or insert a market price record for a species
  */
 async function updateMarketPrice(speciesId, priceData, isManual = false) {
+  if (!db) throw new Error('Firestore not connected');
+
   try {
     const docRef = db.collection('market_prices').doc(speciesId);
     const existing = await docRef.get();
@@ -89,7 +115,6 @@ async function updateMarketPrice(speciesId, priceData, isManual = false) {
 
     if (existing.exists) {
       const current = existing.data();
-      // If current has manual override and this update is NOT manual, preserve manual
       if (current.isManualOverride && !isManual) {
         return { id: speciesId, status: 'skipped_manual_override_active' };
       }
@@ -97,7 +122,6 @@ async function updateMarketPrice(speciesId, priceData, isManual = false) {
 
     await docRef.set(dataToSave, { merge: true });
 
-    // Also log to audit_logs
     await db.collection('audit_logs').add({
       speciesId,
       oldPrice: existing.exists ? existing.data().basePrice : null,
@@ -105,7 +129,7 @@ async function updateMarketPrice(speciesId, priceData, isManual = false) {
       isManualOverride: isManual,
       source: dataToSave.source,
       timestamp: new Date().toISOString()
-    });
+    }).catch(() => {});
 
     return { id: speciesId, changes: 1 };
   } catch (error) {
@@ -118,6 +142,8 @@ async function updateMarketPrice(speciesId, priceData, isManual = false) {
  * Clear a manual override flag for a species
  */
 async function clearManualOverride(speciesId) {
+  if (!db) throw new Error('Firestore not connected');
+
   try {
     const docRef = db.collection('market_prices').doc(speciesId);
     await docRef.update({
@@ -139,6 +165,8 @@ async function clearManualOverride(speciesId) {
  * Read the global config overrides document
  */
 async function readConfigOverrides() {
+  if (!db) return {};
+
   try {
     const docRef = db.collection('config').doc('overrides');
     const doc = await docRef.get();
@@ -147,7 +175,7 @@ async function readConfigOverrides() {
     }
     return {};
   } catch (error) {
-    console.warn('Error reading config overrides from Firestore, falling back to empty:', error.message);
+    console.warn('Note: Could not reach Firestore config overrides, using default catalog:', error.message);
     return {};
   }
 }
@@ -156,6 +184,8 @@ async function readConfigOverrides() {
  * Save / merge config overrides
  */
 async function writeConfigOverrides(data) {
+  if (!db) throw new Error('Firestore not connected');
+
   try {
     const docRef = db.collection('config').doc('overrides');
     await docRef.set(data, { merge: true });
@@ -170,6 +200,8 @@ async function writeConfigOverrides(data) {
  * Reset all config overrides
  */
 async function resetConfigOverrides() {
+  if (!db) throw new Error('Firestore not connected');
+
   try {
     const docRef = db.collection('config').doc('overrides');
     await docRef.set({});
@@ -188,8 +220,12 @@ async function resetConfigOverrides() {
  * Save an appraisal valuation result to Firestore
  */
 async function saveAppraisal(appraisalData) {
+  const certId = appraisalData.certificateId || `GM-${Date.now().toString().slice(-8)}`;
+  if (!db) {
+    return { certificateId: certId, success: false, reason: 'offline' };
+  }
+
   try {
-    const certId = appraisalData.certificateId || `GM-${Date.now().toString().slice(-8)}`;
     const docRef = db.collection('appraisals').doc(certId);
     const record = {
       ...appraisalData,
@@ -199,8 +235,8 @@ async function saveAppraisal(appraisalData) {
     await docRef.set(record);
     return { certificateId: certId, success: true };
   } catch (error) {
-    console.error('Error saving appraisal to Firestore:', error);
-    throw error;
+    console.warn('Note: Appraisal save skipped (offline/unreachable):', error.message);
+    return { certificateId: certId, success: false, error: error.message };
   }
 }
 
@@ -208,6 +244,8 @@ async function saveAppraisal(appraisalData) {
  * Retrieve a saved appraisal by certificate ID
  */
 async function getAppraisal(certificateId) {
+  if (!db) return null;
+
   try {
     const docRef = db.collection('appraisals').doc(certificateId);
     const doc = await docRef.get();
@@ -227,6 +265,8 @@ async function getAppraisal(certificateId) {
  * Fetch scraped listings for a species from Firestore
  */
 async function getMarketListings(speciesId = null) {
+  if (!db) return [];
+
   try {
     let query = db.collection('market_listings');
     if (speciesId) {
@@ -237,7 +277,7 @@ async function getMarketListings(speciesId = null) {
     snapshot.forEach(doc => listings.push({ id: doc.id, ...doc.data() }));
     return listings;
   } catch (error) {
-    console.error('Error fetching market listings from Firestore:', error);
+    console.warn('Note: Could not reach Firestore market listings, returning empty array:', error.message);
     return [];
   }
 }
